@@ -1,0 +1,42 @@
+# Render Blueprint — Multi-Bot Telegram Worker
+# Docs: https://render.com/docs/background-workers
+#
+# After deploy: Dashboard → agents-tg-bots → Environment → add all BOT_TOKEN_* secrets
+
+services:
+  - type: worker
+    name: agents-tg-bots
+    runtime: python
+    plan: starter
+    buildCommand: >-
+      pip install poetry &&
+      poetry config virtualenvs.create false &&
+      poetry install --no-interaction --no-ansi --no-root
+    startCommand: python -m src.main
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: GROUP_CHAT_ID
+        sync: false
+      - key: BOT_TOKEN_ORCHESTRATOR
+        sync: false
+      - key: BOT_TOKEN_PA
+        sync: false
+      - key: BOT_TOKEN_CODER
+        sync: false
+      - key: BOT_TOKEN_RESEARCH
+        sync: false
+      - key: BOT_TOKEN_SECURITY
+        sync: false
+      - key: BOT_TOKEN_BUSINESS
+        sync: false
+      - key: BOT_TOKEN_MARKETING
+        sync: false
+      - key: QWEN_API_KEY
+        sync: false
+      - key: QWEN_API_BASE
+        value: https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct/v1
+      - key: QWEN_MODEL
+        value: Qwen/Qwen2.5-72B-Instruct

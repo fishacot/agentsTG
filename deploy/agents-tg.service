@@ -1,0 +1,29 @@
+[Unit]
+Description=AI Agents Telegram Multi-Bot System
+After=network.target
+
+[Service]
+Type=simple
+User=botsuser
+Group=botsuser
+WorkingDirectory=/opt/agentsTG
+Environment=PYTHONUNBUFFERED=1
+Environment=PATH=/home/botsuser/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+# Load environment variables from .env file
+EnvironmentFile=/opt/agentsTG/.env
+
+# Run the bots
+ExecStart=/home/botsuser/.local/bin/poetry run python -m src.main
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agents-tg
+
+[Install]
+WantedBy=multi-user.target

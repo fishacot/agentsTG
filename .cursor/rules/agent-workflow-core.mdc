@@ -1,0 +1,14 @@
+---
+description: План → diff → verify → журнал → итог (универсально)
+alwaysApply: true
+---
+
+# Ядро процесса
+
+- Краткий план → минимальный diff → verify → обновить `docs/implementation-notes.md` → итог.
+- Канон процесса: `CursoRules/AGENTS.md` (если CursoRules в репо) или скопированный `AGENTS.md` / правила в `.cursor/rules/`.
+- Verify: команды из **`docs/PROJECT_VERIFICATION.md`** в корне workspace; если нет — спроси человека и предложи создать из `CursoRules/docs/VERIFICATION_TEMPLATE.md`.
+- Не меняй файлы вне scope задачи.
+- **Не редактируй** папку `CursoRules/` при обычной разработке приложения — только если задача явно «обновить CursoRules».
+- Не предлагай CLI **claw**, пока человек явно не попросил.
+- Соблюдай `task-closure-protocol.mdc` и `implementation-notes.mdc`.

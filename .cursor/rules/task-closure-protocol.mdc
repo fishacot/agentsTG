@@ -1,0 +1,12 @@
+---
+description: Приёмка, до 3 циклов verify, подтверждение рисков
+alwaysApply: true
+---
+
+# Замыкание задачи
+
+- Шаблон запроса: `docs/TASK_TEMPLATE.md` (в workspace) или `CursoRules/docs/TASK_TEMPLATE.md`.
+- Канон: `CursoRules/AGENTS.md`.
+- Нет цели, границ и проверяемой приёмки — **сначала вопросы**, не большой diff.
+- После правок: verify по `docs/PROJECT_VERIFICATION.md`; при падении — до **3** попыток, затем блокер в `docs/implementation-notes.md` и вопрос человеку.
+- Удаление файлов, mass replace, CI, секреты — только после **явного «да»** в чате.

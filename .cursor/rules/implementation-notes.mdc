@@ -1,0 +1,26 @@
+---
+description: Журнал решений при реализации SPEC (Thariq / Anthropic) — для любого проекта
+alwaysApply: true
+---
+
+# Implementation notes (обязательно)
+
+При реализации **любой** спецификации, ТЗ или крупной задачи:
+
+1. Веди **running log** в **`docs/implementation-notes.md` в корне workspace** (проекта, который открыт в Cursor).
+2. Если файла нет — создай из `CursoRules/docs/implementation-notes.TEMPLATE.md`.
+3. **Обновляй после каждой логической части** работы, не только в конце сессии.
+4. Записывай:
+   - решения, которых не было в SPEC;
+   - изменённые файлы (пути);
+   - tradeoffs;
+   - отложенное (TODO) и риски;
+   - результаты verify из `docs/PROJECT_VERIFICATION.md` (если есть).
+5. SPEC не переписывай молча — расхождения в notes + кратко человеку.
+6. Не пиши в notes секреты, ключи API, PII.
+
+**Не путать:** журнал проекта — в `docs/` **корня workspace**, не внутри `CursoRules/` (CursoRules — только шаблоны).
+
+Формулировка для промпта:
+
+> Implement \<SPEC\> and while you do, keep a running docs/implementation-notes.md with decisions not in the spec, changes, tradeoffs, and anything I should know.

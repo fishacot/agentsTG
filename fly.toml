@@ -1,0 +1,27 @@
+# Fly.io — бесплатный always-on деплой для Telegram polling (7 ботов)
+# Docs: https://fly.io/docs/launch/
+#
+# Deploy:
+#   fly auth login
+#   fly launch --no-deploy          # первый раз, выбери регион ams/fra
+#   fly secrets set BOT_TOKEN_ORCHESTRATOR=... BOT_TOKEN_PA=... (остальные токены)
+#   fly secrets set GROUP_CHAT_ID=-1003620415441 QWEN_API_KEY=hf_...
+#   fly deploy
+#
+# Logs: fly logs
+
+app = 'agents-tg-bots'
+primary_region = 'ams'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  LOG_LEVEL = 'INFO'
+  QWEN_API_BASE = 'https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct/v1'
+  QWEN_MODEL = 'Qwen/Qwen2.5-72B-Instruct'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'
+  cpus = 1
