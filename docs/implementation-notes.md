@@ -6,7 +6,27 @@
 
 ---
 
-## 2026-05-27 — Timeweb Cloud VPS: production deploy (350–400₽/мес)
+## 2026-05-27 — Per-agent Hugging Face models (free tier)
+
+- **Задача:** Подобрать лучшие бесплатные модели HF для каждого агента, один токен `QWEN_API_KEY`.
+- **API:** Переведён на OpenAI-compatible endpoint `https://router.huggingface.co/v1/chat/completions`.
+- **Модели по ролям** (`src/agents_tg/services/agent_models.py`):
+
+  | Агент | Модель | Зачем |
+  |-------|--------|-------|
+  | Егор (orchestrator) | `Qwen/Qwen2.5-7B-Instruct` | JSON-планирование, routing |
+  | Эльза (PA) | `microsoft/Phi-3.5-mini-instruct` | Быстрый парсинг задач/заметок |
+  | Руслан (coder) | `Qwen/Qwen2.5-Coder-7B-Instruct` | Код, архитектура |
+  | Ульяна (research) | `meta-llama/Llama-3.1-8B-Instruct` | Синтез, длинный контекст |
+  | Артём (security) | `mistralai/Mistral-7B-Instruct-v0.3` | Аналитика, чеклисты рисков |
+  | Ваня (business) | `meta-llama/Llama-3.1-8B-Instruct` | Структурированные планы |
+  | Тася (marketing) | `mistralai/Mistral-7B-Instruct-v0.3` | Креатив, копирайт |
+
+- **Override:** env `MODEL_<ROLE>` или `settings.get_agent_model(agent_key)`.
+- **Файлы:** `agent_models.py`, `qwen_client.py`, `settings.py`, `specialists.py`, `orchestrator.py`, `personal_assistant.py`, `.env.example`, `render.yaml`, `tests/test_agent_models.py`.
+- **Tradeoff:** 7B модели надёжнее на free tier, чем 72B (cold start / лимиты). Качество ниже 72B, но стабильнее для 24/7.
+
+---
 
 - **Решение:** Пользователь готов платить 350–400₽/мес → VPS в Амстердаме (Timeweb Cloud)
 - **Создано:**

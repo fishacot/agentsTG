@@ -155,7 +155,11 @@ class Orchestrator:
             )
             messages.append({"role": "assistant", "content": plan_status})
 
-        response = await qwen_client.chat(messages, temperature=0.1)
+        response = await qwen_client.chat(
+            messages,
+            temperature=0.1,
+            agent_key="orchestrator",
+        )
 
         try:
             clean_response = response.strip()

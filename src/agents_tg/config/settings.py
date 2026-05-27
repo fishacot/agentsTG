@@ -38,12 +38,20 @@ class AppSettings(BaseSettings):
     # Group chat for inter-bot communication
     GROUP_CHAT_ID: int = 0  # ID of group where all bots collaborate
 
-    # AI Settings
+    # AI Settings (Hugging Face Inference API — one token for all agents)
     QWEN_API_KEY: str = ""
-    QWEN_API_BASE: str = (
-        "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct"
-    )
-    QWEN_MODEL: str = "Qwen/Qwen2.5-72B-Instruct"
+    QWEN_API_BASE: str = "https://router.huggingface.co/v1/chat/completions"
+    QWEN_MODEL: str = "Qwen/Qwen2.5-7B-Instruct"
+
+    # Per-agent model overrides (optional; defaults in agent_models.py)
+    MODEL_ORCHESTRATOR: str = ""
+    MODEL_PERSONAL_ASSISTANT: str = ""
+    MODEL_CODER: str = ""
+    MODEL_RESEARCH: str = ""
+    MODEL_SECURITY: str = ""
+    MODEL_BUSINESS: str = ""
+    MODEL_MARKETING: str = ""
+    MODEL_DEFAULT: str = ""
 
     # Mem0 Settings
     MEM0_API_KEY: str = ""  # Optional if using local
@@ -73,6 +81,25 @@ class AppSettings(BaseSettings):
     def async_database_url(self) -> str:
         """DATABASE_URL with asyncpg driver for SQLAlchemy."""
         return normalize_database_url(self.DATABASE_URL)
+
+    def get_agent_model(self, agent_key: str) -> str:
+        """Resolve HF model id for an agent (env override → code default)."""
+        from src.agents_tg.services.agent_models import AGENT_MODELS, MODEL_DEFAULT
+
+        env_map = {
+            "orchestrator": self.MODEL_ORCHESTRATOR,
+            "personal_assistant": self.MODEL_PERSONAL_ASSISTANT,
+            "coder": self.MODEL_CODER,
+            "research": self.MODEL_RESEARCH,
+            "security_ai": self.MODEL_SECURITY,
+            "business_manager": self.MODEL_BUSINESS,
+            "marketing": self.MODEL_MARKETING,
+            "general": self.MODEL_DEFAULT,
+        }
+        override = env_map.get(agent_key, "")
+        if override:
+            return override
+        return AGENT_MODELS.get(agent_key, MODEL_DEFAULT)
 
 
 def get_settings() -> AppSettings:

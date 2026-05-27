@@ -12,7 +12,7 @@ class TestAppSettings:
         """Verify default values are set correctly."""
         settings = AppSettings()
         # assert settings.BOT_TOKEN == ""  # Skip if .env is present
-        assert "huggingface.co" in settings.QWEN_API_BASE
+        assert "huggingface.co" in settings.QWEN_API_BASE or "router.huggingface" in settings.QWEN_API_BASE
         assert settings.LOG_LEVEL == "INFO"
         assert settings.DEBUG is False
 

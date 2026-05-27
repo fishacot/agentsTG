@@ -52,6 +52,7 @@ class ToolEnabledAgent:
         return await qwen_client.chat(
             [{"role": "user", "content": prompt}],
             temperature=0.1,
+            agent_key=self.agent_key,
         )
 
     async def _gather_context(self, tool_intent: str) -> str:
@@ -104,6 +105,7 @@ class ToolEnabledAgent:
             [{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=900,
+            agent_key=self.agent_key,
         )
 
     async def process(self, user_message: str, user_id: str = "default") -> str:

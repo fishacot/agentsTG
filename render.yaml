@@ -37,6 +37,6 @@ services:
       - key: QWEN_API_KEY
         sync: false
       - key: QWEN_API_BASE
-        value: https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct/v1
+        value: https://router.huggingface.co/v1/chat/completions
       - key: QWEN_MODEL
-        value: Qwen/Qwen2.5-72B-Instruct
+        value: Qwen/Qwen2.5-7B-Instruct

@@ -103,6 +103,7 @@ class PersonalAssistant:
         response = await qwen_client.chat(
             [{"role": "user", "content": prompt}],
             temperature=0.1,
+            agent_key="personal_assistant",
         )
 
         if "CREATE_NOTE" in response:
