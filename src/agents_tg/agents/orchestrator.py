@@ -111,12 +111,12 @@ class Orchestrator:
             },
         )
 
-        workflow.add_edge("personal_assistant", "supervisor")
-        workflow.add_edge("research", "supervisor")
-        workflow.add_edge("coder", "supervisor")
-        workflow.add_edge("security_ai", "supervisor")
-        workflow.add_edge("business_manager", "supervisor")
-        workflow.add_edge("marketing", "supervisor")
+        workflow.add_edge("personal_assistant", END)
+        workflow.add_edge("research", END)
+        workflow.add_edge("coder", END)
+        workflow.add_edge("security_ai", END)
+        workflow.add_edge("business_manager", END)
+        workflow.add_edge("marketing", END)
         workflow.add_edge("general", END)
 
         return workflow

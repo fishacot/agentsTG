@@ -1,5 +1,6 @@
 """LLM client for Groq / Hugging Face (OpenAI-compatible chat completions)."""
 
+import asyncio
 import logging
 from typing import Any
 
@@ -10,6 +11,11 @@ from src.agents_tg.services.agent_models import AGENT_MODELS, MODEL_DEFAULT
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Serialize LLM calls to avoid Groq free-tier burst 429 errors
+_LLM_SEMAPHORE = asyncio.Semaphore(1)
+_RETRYABLE_STATUS = frozenset({429, 503})
+_RETRY_DELAYS_SEC = (2.0, 4.0, 8.0)
 
 
 class QwenClient:
@@ -48,7 +54,6 @@ class QwenClient:
         resolved_model = model or (
             self.model_for_agent(agent_key) if agent_key else self.default_model
         )
-        session = await self._get_session()
 
         payload: dict[str, Any] = {
             "model": resolved_model,
@@ -57,25 +62,55 @@ class QwenClient:
             "max_tokens": max_tokens,
         }
 
-        try:
-            response = await session.post(self.api_base, json=payload)
-            response.raise_for_status()
-            result = response.json()
-            return self._extract_text(result)
+        async with _LLM_SEMAPHORE:
+            return await self._post_with_retry(resolved_model, payload)
 
-        except httpx.HTTPStatusError as e:
+    async def _post_with_retry(
+        self,
+        resolved_model: str,
+        payload: dict[str, Any],
+    ) -> str:
+        session = await self._get_session()
+        last_error: Exception | None = None
+        max_attempts = len(_RETRY_DELAYS_SEC) + 1
+
+        for attempt in range(max_attempts):
+            try:
+                response = await session.post(self.api_base, json=payload)
+                response.raise_for_status()
+                return self._extract_text(response.json())
+            except httpx.HTTPStatusError as e:
+                last_error = e
+                if (
+                    e.response.status_code not in _RETRYABLE_STATUS
+                    or attempt >= max_attempts - 1
+                ):
+                    break
+                logger.warning(
+                    "LLM rate limit model=%s status=%s attempt=%s/%s",
+                    resolved_model,
+                    e.response.status_code,
+                    attempt + 1,
+                    max_attempts - 1,
+                )
+                await asyncio.sleep(_RETRY_DELAYS_SEC[attempt])
+            except Exception as e:
+                last_error = e
+                break
+
+        if isinstance(last_error, httpx.HTTPStatusError):
             logger.error(
                 "LLM API error model=%s status=%s body=%s",
                 resolved_model,
-                e.response.status_code,
-                e.response.text[:500],
+                last_error.response.status_code,
+                last_error.response.text[:500],
             )
             raise QwenAPIError(
-                f"API error ({resolved_model}): {e.response.status_code}"
-            ) from e
-        except Exception as e:
-            logger.error("LLM request failed model=%s: %s", resolved_model, e)
-            raise QwenAPIError(f"Request failed: {e}") from e
+                f"API error ({resolved_model}): {last_error.response.status_code}"
+            ) from last_error
+
+        logger.error("LLM request failed model=%s: %s", resolved_model, last_error)
+        raise QwenAPIError(f"Request failed: {last_error}") from last_error
 
     @staticmethod
     def _extract_text(result: Any) -> str:

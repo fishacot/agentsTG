@@ -6,6 +6,18 @@
 
 ---
 
+## 2026-05-28 — Groq 429: меньше вызовов + retry
+
+- **Симптом на VPS:** `QwenAPIError: API error (llama-3.1-8b-instant): 429` в `general_node` → `_final_answer`.
+- **Причина:** Groq free tier лимитирует RPS; оркестратор = supervisor (1) + specialist `_tool_intent` (1) + `_final_answer` (1) ≈ **3 LLM-вызова** на сообщение; раньше specialist возвращался в supervisor (ещё больше).
+- **Правки (локально, ещё не в origin):**
+  - `orchestrator.py` — после specialist ребро в `END`, не обратно в supervisor.
+  - `qwen_client.py` — `asyncio.Semaphore(1)` (сериализация запросов) + retry на 429/503 с задержками 2/4/8 с (4 попытки).
+- **Deploy на VPS:** `git pull && systemctl restart agents-tg` после push.
+- **Если 429 останется:** писать напрямую боту-специалисту (1 агент = те же 2–3 вызова, но без supervisor); дальше — отключить `_tool_intent` для простых запросов.
+
+---
+
 ## 2026-05-28 — Groq API (free tier) вместо Hugging Face
 
 - **Причина:** HF Inference Providers — $0.10/мес, 402 после одного диалога; оркестратор делает ~15 LLM-вызовов на сообщение.
