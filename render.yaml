@@ -34,9 +34,9 @@ services:
         sync: false
       - key: BOT_TOKEN_MARKETING
         sync: false
-      - key: QWEN_API_KEY
+      - key: GROQ_API_KEY
         sync: false
-      - key: QWEN_API_BASE
-        value: https://router.huggingface.co/v1/chat/completions
-      - key: QWEN_MODEL
-        value: Qwen/Qwen2.5-7B-Instruct
+      - key: GROQ_API_BASE
+        value: https://api.groq.com/openai/v1/chat/completions
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant

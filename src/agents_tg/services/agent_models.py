@@ -1,38 +1,28 @@
-"""Per-agent Hugging Face model selection (free Inference API tier).
+"""Per-agent Groq model selection (free tier, no credit card).
 
-Models must be available in your HF Inference Providers settings.
-Qwen family is used by default for maximum compatibility on free tier.
 Override any model via env: MODEL_<AGENT_KEY> (see settings.py).
+Docs: https://console.groq.com/docs/models
 """
 
 from typing import Final
 
-# Shared general model — confirmed working on HF Inference Providers
-MODEL_QWEN_7B: Final[str] = "Qwen/Qwen2.5-7B-Instruct"
+# Fast general model — high daily quota on Groq free tier
+MODEL_LLAMA_8B: Final[str] = "llama-3.1-8b-instant"
 
-# Orchestrator: JSON planning, routing, multi-step coordination
-MODEL_ORCHESTRATOR: Final[str] = MODEL_QWEN_7B
+# Stronger reasoning for orchestrator
+MODEL_LLAMA_70B: Final[str] = "llama-3.3-70b-versatile"
 
-# Personal assistant: structured action parsing (notes, tasks)
-MODEL_PERSONAL_ASSISTANT: Final[str] = MODEL_QWEN_7B
+# Qwen on Groq — coder and complex tasks
+MODEL_QWEN3_32B: Final[str] = "qwen/qwen3-32b"
 
-# Coder: code generation, architecture, review
-MODEL_CODER: Final[str] = "Qwen/Qwen2.5-Coder-7B-Instruct"
-
-# Research: synthesis, summaries with sources
-MODEL_RESEARCH: Final[str] = MODEL_QWEN_7B
-
-# Security: analytical reasoning, structured risk reports
-MODEL_SECURITY: Final[str] = MODEL_QWEN_7B
-
-# Business: structured plans, MVP, prioritization
-MODEL_BUSINESS: Final[str] = MODEL_QWEN_7B
-
-# Marketing: creative copy, positioning, content plans
-MODEL_MARKETING: Final[str] = MODEL_QWEN_7B
-
-# General fallback
-MODEL_DEFAULT: Final[str] = MODEL_QWEN_7B
+MODEL_ORCHESTRATOR: Final[str] = MODEL_LLAMA_70B
+MODEL_PERSONAL_ASSISTANT: Final[str] = MODEL_LLAMA_8B
+MODEL_CODER: Final[str] = MODEL_QWEN3_32B
+MODEL_RESEARCH: Final[str] = MODEL_LLAMA_8B
+MODEL_SECURITY: Final[str] = MODEL_LLAMA_8B
+MODEL_BUSINESS: Final[str] = MODEL_LLAMA_8B
+MODEL_MARKETING: Final[str] = MODEL_LLAMA_8B
+MODEL_DEFAULT: Final[str] = MODEL_LLAMA_8B
 
 AGENT_MODELS: Final[dict[str, str]] = {
     "orchestrator": MODEL_ORCHESTRATOR,

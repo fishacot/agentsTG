@@ -6,6 +6,25 @@
 
 ---
 
+## 2026-05-28 — Groq API (free tier) вместо Hugging Face
+
+- **Причина:** HF Inference Providers — $0.10/мес, 402 после одного диалога; оркестратор делает ~15 LLM-вызовов на сообщение.
+- **Решение:** Primary LLM = **Groq** (`GROQ_API_KEY`), HF остаётся optional fallback если Groq key пуст.
+- **Endpoint:** `https://api.groq.com/openai/v1/chat/completions`
+- **Модели** (`agent_models.py`):
+
+  | Агент | Groq model |
+  |-------|------------|
+  | Егор | `llama-3.3-70b-versatile` |
+  | Эльза, Ульяна, Артём, Ваня, Тася | `llama-3.1-8b-instant` |
+  | Руслан | `qwen/qwen3-32b` |
+
+- **VPS:** FirstByte FI 91.186.221.32, systemd `agents-tg`, Python 3.11 via deadsnakes.
+- **Файлы:** `settings.py` (`llm_api_key`, `llm_api_base`), `qwen_client.py`, `agent_models.py`, `.env.example`, `render.yaml`.
+- **TODO:** Упростить оркестратор (меньше LLM round-trips) — иначе Groq daily limits тоже кончатся быстро.
+
+---
+
 ## 2026-05-27 — Per-agent Hugging Face models (free tier)
 
 - **Задача:** Подобрать лучшие бесплатные модели HF для каждого агента, один токен `QWEN_API_KEY`.

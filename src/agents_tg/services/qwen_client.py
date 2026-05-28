@@ -1,4 +1,4 @@
-"""Hugging Face Inference API client (OpenAI-compatible chat completions)."""
+"""LLM client for Groq / Hugging Face (OpenAI-compatible chat completions)."""
 
 import logging
 from typing import Any
@@ -13,16 +13,16 @@ settings = get_settings()
 
 
 class QwenClient:
-    """Async client for Hugging Face chat models (same token for all agents)."""
+    """Async client for Groq or HF chat models (one API key for all agents)."""
 
     def __init__(self) -> None:
-        self.api_key = settings.QWEN_API_KEY
-        self.api_base = settings.QWEN_API_BASE
-        self.default_model = settings.QWEN_MODEL or MODEL_DEFAULT
+        self.api_key = settings.llm_api_key
+        self.api_base = settings.llm_api_base
+        self.default_model = settings.llm_default_model or MODEL_DEFAULT
         self._session: httpx.AsyncClient | None = None
 
     def model_for_agent(self, agent_key: str) -> str:
-        """Return HF model id for an agent (env overrides supported in settings)."""
+        """Return model id for an agent (env overrides supported in settings)."""
         return settings.get_agent_model(agent_key)
 
     async def _get_session(self) -> httpx.AsyncClient:
@@ -44,16 +44,7 @@ class QwenClient:
         model: str | None = None,
         agent_key: str | None = None,
     ) -> str:
-        """
-        Send chat request to Hugging Face Inference API.
-
-        Args:
-            messages: OpenAI-style message dicts with role and content
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            model: Explicit HF model id (highest priority)
-            agent_key: Agent key to resolve model from AGENT_MODELS
-        """
+        """Send chat request to Groq or Hugging Face Inference API."""
         resolved_model = model or (
             self.model_for_agent(agent_key) if agent_key else self.default_model
         )
@@ -74,7 +65,7 @@ class QwenClient:
 
         except httpx.HTTPStatusError as e:
             logger.error(
-                "HF API error model=%s status=%s body=%s",
+                "LLM API error model=%s status=%s body=%s",
                 resolved_model,
                 e.response.status_code,
                 e.response.text[:500],
@@ -83,7 +74,7 @@ class QwenClient:
                 f"API error ({resolved_model}): {e.response.status_code}"
             ) from e
         except Exception as e:
-            logger.error("HF request failed model=%s: %s", resolved_model, e)
+            logger.error("LLM request failed model=%s: %s", resolved_model, e)
             raise QwenAPIError(f"Request failed: {e}") from e
 
     @staticmethod
@@ -120,12 +111,11 @@ class QwenClient:
 
 
 class QwenAPIError(Exception):
-    """Exception for Hugging Face inference API errors."""
+    """Exception for LLM inference API errors."""
 
     pass
 
 
 qwen_client = QwenClient()
 
-# Re-export for convenience
 __all__ = ["QwenClient", "QwenAPIError", "qwen_client", "AGENT_MODELS"]

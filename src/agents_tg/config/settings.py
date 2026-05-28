@@ -38,7 +38,11 @@ class AppSettings(BaseSettings):
     # Group chat for inter-bot communication
     GROUP_CHAT_ID: int = 0  # ID of group where all bots collaborate
 
-    # AI Settings (Hugging Face Inference API — one token for all agents)
+    # AI Settings — Groq (primary, free tier) or legacy Hugging Face fallback
+    GROQ_API_KEY: str = ""
+    GROQ_API_BASE: str = "https://api.groq.com/openai/v1/chat/completions"
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
+
     QWEN_API_KEY: str = ""
     QWEN_API_BASE: str = "https://router.huggingface.co/v1/chat/completions"
     QWEN_MODEL: str = "Qwen/Qwen2.5-7B-Instruct"
@@ -82,8 +86,27 @@ class AppSettings(BaseSettings):
         """DATABASE_URL with asyncpg driver for SQLAlchemy."""
         return normalize_database_url(self.DATABASE_URL)
 
+    @property
+    def llm_api_key(self) -> str:
+        """Active LLM API key (Groq preferred)."""
+        return self.GROQ_API_KEY or self.QWEN_API_KEY
+
+    @property
+    def llm_api_base(self) -> str:
+        """Active LLM chat completions endpoint."""
+        if self.GROQ_API_KEY:
+            return self.GROQ_API_BASE
+        return self.QWEN_API_BASE
+
+    @property
+    def llm_default_model(self) -> str:
+        """Default model when none specified."""
+        if self.GROQ_API_KEY:
+            return self.GROQ_MODEL
+        return self.QWEN_MODEL
+
     def get_agent_model(self, agent_key: str) -> str:
-        """Resolve HF model id for an agent (env override → code default)."""
+        """Resolve model id for an agent (env override → code default)."""
         from src.agents_tg.services.agent_models import AGENT_MODELS, MODEL_DEFAULT
 
         env_map = {

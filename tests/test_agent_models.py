@@ -24,8 +24,8 @@ class TestAgentModels:
         }
         assert expected_keys.issubset(AGENT_MODELS.keys())
 
-    def test_coder_uses_code_model(self):
-        assert "Coder" in MODEL_CODER
+    def test_coder_uses_qwen_on_groq(self):
+        assert "qwen" in MODEL_CODER.lower()
 
     def test_coder_differs_from_general(self):
         assert MODEL_CODER != MODEL_ORCHESTRATOR
