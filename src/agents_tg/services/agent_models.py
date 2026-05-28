@@ -1,34 +1,38 @@
 """Per-agent Hugging Face model selection (free Inference API tier).
 
-Models are chosen for reliability on HF serverless inference and role fit.
+Models must be available in your HF Inference Providers settings.
+Qwen family is used by default for maximum compatibility on free tier.
 Override any model via env: MODEL_<AGENT_KEY> (see settings.py).
 """
 
 from typing import Final
 
-# Orchestrator: JSON planning, routing, multi-step coordination
-MODEL_ORCHESTRATOR: Final[str] = "Qwen/Qwen2.5-7B-Instruct"
+# Shared general model — confirmed working on HF Inference Providers
+MODEL_QWEN_7B: Final[str] = "Qwen/Qwen2.5-7B-Instruct"
 
-# Personal assistant: fast structured action parsing (notes, tasks)
-MODEL_PERSONAL_ASSISTANT: Final[str] = "microsoft/Phi-3.5-mini-instruct"
+# Orchestrator: JSON planning, routing, multi-step coordination
+MODEL_ORCHESTRATOR: Final[str] = MODEL_QWEN_7B
+
+# Personal assistant: structured action parsing (notes, tasks)
+MODEL_PERSONAL_ASSISTANT: Final[str] = MODEL_QWEN_7B
 
 # Coder: code generation, architecture, review
 MODEL_CODER: Final[str] = "Qwen/Qwen2.5-Coder-7B-Instruct"
 
-# Research: long-context synthesis, summaries with sources
-MODEL_RESEARCH: Final[str] = "meta-llama/Llama-3.1-8B-Instruct"
+# Research: synthesis, summaries with sources
+MODEL_RESEARCH: Final[str] = MODEL_QWEN_7B
 
 # Security: analytical reasoning, structured risk reports
-MODEL_SECURITY: Final[str] = "mistralai/Mistral-7B-Instruct-v0.3"
+MODEL_SECURITY: Final[str] = MODEL_QWEN_7B
 
 # Business: structured plans, MVP, prioritization
-MODEL_BUSINESS: Final[str] = "meta-llama/Llama-3.1-8B-Instruct"
+MODEL_BUSINESS: Final[str] = MODEL_QWEN_7B
 
 # Marketing: creative copy, positioning, content plans
-MODEL_MARKETING: Final[str] = "mistralai/Mistral-7B-Instruct-v0.3"
+MODEL_MARKETING: Final[str] = MODEL_QWEN_7B
 
 # General fallback
-MODEL_DEFAULT: Final[str] = "Qwen/Qwen2.5-7B-Instruct"
+MODEL_DEFAULT: Final[str] = MODEL_QWEN_7B
 
 AGENT_MODELS: Final[dict[str, str]] = {
     "orchestrator": MODEL_ORCHESTRATOR,

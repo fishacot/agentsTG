@@ -27,8 +27,8 @@ class TestAgentModels:
     def test_coder_uses_code_model(self):
         assert "Coder" in MODEL_CODER
 
-    def test_orchestrator_and_pa_differ(self):
-        assert MODEL_ORCHESTRATOR != MODEL_PERSONAL_ASSISTANT
+    def test_coder_differs_from_general(self):
+        assert MODEL_CODER != MODEL_ORCHESTRATOR
 
     def test_env_override(self, monkeypatch):
         monkeypatch.setenv("MODEL_CODER", "custom/coder-model")
