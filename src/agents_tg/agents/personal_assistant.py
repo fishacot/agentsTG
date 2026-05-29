@@ -144,7 +144,19 @@ class PersonalAssistant:
             data = await pa.list_tasks()
             return tool_result(**data)
 
-        return [
+        async def post_channel(**kwargs: Any) -> str:
+            from src.agents_tg.services.telegram_notes import post_to_notes_channel
+
+            title = str(kwargs.get("title", "")).strip()
+            body = str(kwargs.get("body", "")).strip()
+            if not pa._valid_note_title(title):
+                return tool_result(ok=False, error="invalid_title")
+            if not body:
+                body = title
+            data = await post_to_notes_channel(title, body)
+            return tool_result(**data)
+
+        tools = [
             AgentTool(
                 name="create_obsidian_note",
                 description=(
@@ -194,10 +206,36 @@ class PersonalAssistant:
                 parameters={"type": "object", "properties": {}},
                 handler=list_tasks_handler,
             ),
+            AgentTool(
+                name="post_to_notes_channel",
+                description=(
+                    "Опубликовать заметку в Telegram-канал пользователя. "
+                    "Только при явной просьбе записать/сохранить и если канал настроен в среде."
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string", "description": "Заголовок"},
+                        "body": {"type": "string", "description": "Текст заметки"},
+                    },
+                    "required": ["title", "body"],
+                },
+                handler=post_channel,
+            ),
         ]
+        return tools
 
-    async def process(self, message: str, user_id: str = "default") -> str:
+    async def process(
+        self,
+        message: str,
+        user_id: str = "default",
+        environment=None,
+        environment_block: str = "",
+    ) -> str:
         """Understand the user's goal; LLM formulates every user-visible reply."""
+        from src.agents_tg.services.environment_context import AgentEnvironment
+
+        env = environment if isinstance(environment, AgentEnvironment) else None
         return await agent_runner.run(
             agent_key="personal_assistant",
             soul=self._load_soul(),
@@ -205,6 +243,8 @@ class PersonalAssistant:
             user_id=user_id,
             tools=self._tools(),
             output_hints=MANUS_PA_STYLE,
+            environment=env,
+            environment_block=environment_block,
             temperature=0.55,
             max_tokens=1024,
         )

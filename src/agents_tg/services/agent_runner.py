@@ -11,12 +11,16 @@ from typing import Any
 from src.agents_tg.services.agent_prompts import (
     FINALIZE_USER_REPLY,
     GOAL_DIRECTIVE,
+    TELEGRAM_AGENT_PROTOCOL,
+    TELEGRAM_HTML_FORMAT,
     WEB_TOOL_HINT,
 )
 from src.agents_tg.services.agent_identity import get_agent_identity
+from src.agents_tg.services.chat_history import chat_history
+from src.agents_tg.services.environment_context import AgentEnvironment
 from src.agents_tg.services.memory_service import memory_service
 from src.agents_tg.services.qwen_client import qwen_client
-from src.agents_tg.utils.internet import fetch_web_page, web_search
+from src.agents_tg.services.search_provider import deep_research
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +58,8 @@ async def _memory_block(user_message: str, user_id: str) -> str:
     if not memories:
         return (
             "\n\nПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ:\n"
-            "Пока нет сохранённых фактов. Можешь запоминать через remember_about_user, "
-            "когда пользователь сообщает что-то важное о себе.\n"
+            "Пока нет сохранённых фактов. Используй remember_about_user, "
+            "когда пользователь сообщает факт о себе.\n"
         )
     lines = []
     for item in memories:
@@ -100,60 +104,37 @@ def _remember_tool(agent_key: str) -> AgentTool:
     )
 
 
-def web_tools() -> list[AgentTool]:
-    async def search_handler(**kwargs: Any) -> str:
+def deep_research_tool() -> AgentTool:
+    async def handler(**kwargs: Any) -> str:
         query = str(kwargs.get("query", "")).strip()
         if not query:
             return tool_result(ok=False, error="empty_query")
-        results = await web_search(query, max_results=5)
-        if not results:
-            return tool_result(ok=True, results=[])
-        compact = []
-        for row in results:
-            compact.append(
-                {
-                    "title": row.get("title") or "",
-                    "url": row.get("href") or row.get("url") or "",
-                    "snippet": (row.get("body") or "")[:280],
-                }
-            )
-        return tool_result(ok=True, results=compact)
+        extra = kwargs.get("extra_queries") or []
+        if isinstance(extra, str):
+            extra = [extra]
+        data = await deep_research(query, extra_queries=list(extra)[:2])
+        return tool_result(**data)
 
-    async def fetch_handler(**kwargs: Any) -> str:
-        url = str(kwargs.get("url", "")).strip()
-        if not url:
-            return tool_result(ok=False, error="empty_url")
-        content = await fetch_web_page(url)
-        if not content or content.startswith("Failed"):
-            return tool_result(ok=False, error="fetch_failed", url=url)
-        return tool_result(ok=True, url=url, content=content[:3000])
-
-    return [
-        AgentTool(
-            name="web_search",
-            description="Поиск в интернете, когда нужны актуальные данные или ссылки.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "Поисковый запрос"},
-                },
-                "required": ["query"],
-            },
-            handler=search_handler,
+    return AgentTool(
+        name="deep_research",
+        description=(
+            "Глубокий поиск в интернете: результаты + содержимое топ-страниц. "
+            "Используй когда нужны актуальные данные, ссылки, сравнение решений."
         ),
-        AgentTool(
-            name="fetch_web_page",
-            description="Загрузить текст страницы по URL для анализа.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "url": {"type": "string", "description": "Полный URL страницы"},
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Основной поисковый запрос"},
+                "extra_queries": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Дополнительные запросы (0-2) для сложной темы",
                 },
-                "required": ["url"],
             },
-            handler=fetch_handler,
-        ),
-    ]
+            "required": ["query"],
+        },
+        handler=handler,
+    )
 
 
 class AgentRunner:
@@ -171,6 +152,8 @@ class AgentRunner:
         tools: list[AgentTool] | None = None,
         output_hints: str = "",
         include_web_tools: bool = False,
+        environment: AgentEnvironment | None = None,
+        environment_block: str = "",
         temperature: float = 0.4,
         max_tokens: int = 900,
     ) -> str:
@@ -181,16 +164,31 @@ class AgentRunner:
         tool_list = list(tools or [])
         tool_list.append(_remember_tool(agent_key))
         if include_web_tools:
-            tool_list.extend(web_tools())
+            tool_list.append(deep_research_tool())
+
+        tool_names = [t.name for t in tool_list]
+        if environment:
+            env_block = environment.to_prompt_block()
+        elif environment_block:
+            env_block = environment_block
+        else:
+            env_block = ""
 
         memory_ctx = await _memory_block(user_message, user_id)
         hints = f"\n\n{output_hints}" if output_hints else ""
         web_hint = f"\n\n{WEB_TOOL_HINT}" if include_web_tools else ""
 
+        history_turns = await chat_history.get_recent(user_id, agent_key)
+        history_block = chat_history.format_for_prompt(history_turns)
+        if history_block:
+            history_block = f"\n\n## НЕДАВНИЙ ДИАЛОГ\n{history_block}\n"
+
         system = (
             f"{GOAL_DIRECTIVE}\n\n"
-            f"Ты — **{human_name}**, {designation}.\n\n"
-            f"{soul}{memory_ctx}{web_hint}{hints}\n\n"
+            f"{TELEGRAM_AGENT_PROTOCOL}\n\n"
+            f"{TELEGRAM_HTML_FORMAT}\n\n"
+            f"Ты — <b>{human_name}</b>, {designation}.\n\n"
+            f"{soul}{env_block}{history_block}{memory_ctx}{web_hint}{hints}\n\n"
             f"user_id для инструментов: {user_id}"
         )
 
@@ -215,6 +213,8 @@ class AgentRunner:
 
             if not tool_calls:
                 if content:
+                    await chat_history.append(user_id, agent_key, "user", user_message)
+                    await chat_history.append(user_id, agent_key, "assistant", content)
                     return content
                 if tools_used:
                     break
@@ -259,12 +259,15 @@ class AgentRunner:
                     }
                 )
 
-        return await self._finalize_user_message(
+        final = await self._finalize_user_message(
             messages,
             agent_key=agent_key,
             temperature=temperature,
             max_tokens=max_tokens,
         )
+        await chat_history.append(user_id, agent_key, "user", user_message)
+        await chat_history.append(user_id, agent_key, "assistant", final)
+        return final
 
     async def _finalize_user_message(
         self,
@@ -297,4 +300,10 @@ class AgentRunner:
 
 agent_runner = AgentRunner()
 
-__all__ = ["AgentRunner", "AgentTool", "agent_runner", "tool_result", "web_tools"]
+__all__ = [
+    "AgentRunner",
+    "AgentTool",
+    "agent_runner",
+    "deep_research_tool",
+    "tool_result",
+]

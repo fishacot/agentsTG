@@ -106,3 +106,34 @@ class FinanceTransaction(Base):
             f"<Transaction id={self.id} {self.transaction_type}"
             f" {self.amount} {self.currency}>"
         )
+
+
+class ChatMessage(Base):
+    """Persisted chat turn for agent dialogue history."""
+
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    telegram_user_id: Mapped[int] = mapped_column(index=True)
+    agent_key: Mapped[str] = mapped_column(String(64), index=True)
+    role: Mapped[str] = mapped_column(String(16))
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+
+class UserFact(Base):
+    """Long-term user fact stored in Postgres (Mem0 fallback)."""
+
+    __tablename__ = "user_facts"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    telegram_user_id: Mapped[int] = mapped_column(index=True)
+    fact: Mapped[str] = mapped_column(Text)
+    agent_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )

@@ -34,6 +34,10 @@ class MemoryService:
         # Fallback: in-process facts per user when Mem0/cloud unavailable.
         self._journal_store: Dict[str, list[dict[str, Any]]] = {}
         self._facts_store: Dict[str, list[str]] = {}
+        self._pg_available = False
+
+    def set_pg_available(self, available: bool) -> None:
+        self._pg_available = available
 
     async def add(
         self, data: str, user_id: str, metadata: Optional[Dict[str, Any]] = None
@@ -55,6 +59,19 @@ class MemoryService:
             except Exception as e:
                 logger.error("Error adding to memory: %s", e)
 
+        if self._pg_available:
+            try:
+                from src.agents_tg.services.user_facts_pg import persist_user_fact
+
+                agent = metadata.get("agent") if metadata else None
+                await persist_user_fact(
+                    telegram_user_id=int(user_id),
+                    fact=text,
+                    agent_key=str(agent) if agent else None,
+                )
+            except Exception as exc:
+                logger.warning("Postgres user fact persist failed: %s", exc)
+
         await self.add_journal_entry(
             user_id=user_id,
             agent=metadata.get("agent") if metadata else None,
@@ -74,11 +91,28 @@ class MemoryService:
             except Exception as e:
                 logger.error("Error searching memory: %s", e)
 
+        await self._load_pg_facts(user_id)
         return self._fallback_search(query, user_id, limit)
+
+    async def _load_pg_facts(self, user_id: str) -> None:
+        if not self._pg_available:
+            return
+        try:
+            from src.agents_tg.services.user_facts_pg import get_user_facts
+
+            facts = await get_user_facts(telegram_user_id=int(user_id), limit=100)
+            if facts:
+                store = self._facts_store.setdefault(user_id, [])
+                for fact in facts:
+                    if fact not in store:
+                        store.append(fact)
+        except Exception as exc:
+            logger.debug("Postgres user facts load failed: %s", exc)
 
     def _fallback_search(
         self, query: str, user_id: str, limit: int
     ) -> List[Dict[str, Any]]:
+        # Note: sync wrapper; pg facts loaded via get_all path in async search
         facts = self._facts_store.get(user_id, [])
         if not facts:
             return []
@@ -100,6 +134,7 @@ class MemoryService:
             except Exception as e:
                 logger.error("Error getting all memories: %s", e)
 
+        await self._load_pg_facts(user_id)
         return [{"text": f} for f in self._facts_store.get(user_id, [])]
 
     async def add_journal_entry(

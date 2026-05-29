@@ -38,6 +38,9 @@ class AppSettings(BaseSettings):
     # Group chat for inter-bot communication
     GROUP_CHAT_ID: int = 0  # ID of group where all bots collaborate
 
+    # Private channel for Elza notes (bot must be channel admin)
+    NOTES_CHANNEL_ID: int = 0
+
     # AI Settings — Groq (primary, free tier) or legacy Hugging Face fallback
     GROQ_API_KEY: str = ""
     GROQ_API_BASE: str = "https://api.groq.com/openai/v1/chat/completions"

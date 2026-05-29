@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-05-28 — Telegram Agents Max Upgrade (8 фаз, API budget = 0)
+
+- **Фаза 1 — Environment «глаза»:** `environment_context.py` (`AgentEnvironment`, `build_environment`); `agent_bot` собирает контекст (chat type, peers, vault, tools, group/dm history) и передаёт в `process()` / `AgentRunner`.
+- **Фаза 2 — История:** `chat_history.py` (in-memory + Redis + Postgres hook); подключено в `AgentRunner` (system prompt + append после ответа).
+- **Фаза 3 — Deep search:** `search_provider.py` (`deep_research`), tool в `agent_runner`; улучшен `internet.py` (retry, `fetch_multiple_pages`).
+- **Фаза 4 — Telegram HTML:** `telegram_format.py` (`sanitize_html_for_telegram`, `send_agent_response`); ответы агентов через HTML с fallback на plain.
+- **Фаза 5 — Протоколы:** `TELEGRAM_AGENT_PROTOCOL`, `TELEGRAM_HTML_FORMAT` в `agent_prompts.py`; HTML `output_hints` в `specialists.py`; orchestrator получает protocol + HTML для `direct_reply`.
+- **Фаза 6 — Канал заметок:** `telegram_notes.py`, tool `post_to_notes_channel` в PA; env `NOTES_CHANNEL_ID`; гайд `deploy/NOTES_CHANNEL.md`.
+- **Фаза 7 — Personalities:** **отложено** до правок пользователя в `docs/AGENT_PERSONALITIES.md` (не переносим в `souls/` без финального текста).
+- **Фаза 8 — Postgres:** модели `ChatMessage`, `UserFact`; `init_db()` в startup; `chat_history.set_pg_available`, `memory_service.set_pg_available` + `user_facts_pg.py`.
+- **Файлы (новые):** `environment_context.py`, `chat_history.py`, `chat_history_pg.py`, `search_provider.py`, `telegram_format.py`, `telegram_notes.py`, `user_facts_pg.py`, `db/init_db.py`, тесты `test_*`.
+- **Verify:** `python -m pytest tests/ -v` — **24 passed**.
+- **Deploy VPS:** `git pull && systemctl restart agents-tg`; задать `NOTES_CHANNEL_ID` при необходимости.
+
+---
+
 ## 2026-05-28 — Goal-oriented агенты (без ACTION/CREATE_NOTE классификации)
 
 - **Проблема:** Эльза на «ты можешь запоминать?» создавала заметку `[Title]` — жёсткая классификация CREATE_NOTE/CHAT.
@@ -18,8 +34,8 @@
 - **Оркестратор:** приветствия/small talk → `direct_reply` от Егора; план показывается только при 2+ шагах.
 - **LLM-вызовов:** было ~3 на сообщение (intent + answer + classify); стало ~1 (+ tool rounds при необходимости).
 - **Файлы:** `agent_runner.py`, `agent_prompts.py`, `qwen_client.chat_completion`, `personal_assistant.py`, `specialists.py`, `orchestrator.py`, `memory_service.py`, тесты.
-- **Verify:** pytest 14 passed.
-- **TODO:** история диалога (multi-turn) в runner; Mem0 на VPS; перенос правок из `AGENT_PERSONALITIES.md`.
+- **Verify:** pytest 15 passed.
+- **Deploy:** commit `3573780` — tools return JSON only; LLM always speaks to user; MANUS_PA_STYLE for Elza.
 
 ---
 

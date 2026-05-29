@@ -22,7 +22,13 @@ if config.config_file_name is not None:
 
 # Import all models so Alembic can detect them for autogenerate
 from src.agents_tg.db.base import Base  # noqa: E402
-from src.agents_tg.db.models import FinanceTransaction, Note, User  # noqa: E402, F401
+from src.agents_tg.db.models import (  # noqa: E402, F401
+    ChatMessage,
+    FinanceTransaction,
+    Note,
+    User,
+    UserFact,
+)
 
 target_metadata = Base.metadata
 

@@ -153,9 +153,15 @@ class AgentBot:
                 )
 
                 if response:
-                    if is_group:
-                        await thinking_msg.delete()
-                        sent = await message.reply(response)
+                    from src.agents_tg.utils.telegram_format import send_agent_response
+
+                    sent = await send_agent_response(
+                        message,
+                        response,
+                        reply_in_group=is_group,
+                        thinking_message=thinking_msg,
+                    )
+                    if is_group and sent:
                         coordinator.add_message(
                             message.chat.id,
                             GroupMessage(
@@ -166,8 +172,6 @@ class AgentBot:
                                 mentions=self._extract_mentions(response),
                             ),
                         )
-                    else:
-                        await thinking_msg.edit_text(response)
                 else:
                     await thinking_msg.edit_text(
                         "😕 Не смог обработать запрос. Попробуйте переформулировать."
@@ -261,6 +265,21 @@ class AgentBot:
 
         return "\n".join(lines)
 
+    def _tool_names_for_agent(self) -> list[str]:
+        """Tool names exposed to environment context."""
+        common = ["remember_about_user"]
+        if self.agent_key == "personal_assistant":
+            return [
+                "create_obsidian_note",
+                "post_to_notes_channel",
+                "add_task",
+                "list_tasks",
+                *common,
+            ]
+        if self.agent_key == "orchestrator":
+            return ["delegation", *common]
+        return ["deep_research", *common]
+
     async def _process_request(
         self,
         message: Message,
@@ -269,27 +288,47 @@ class AgentBot:
         coordinator,
     ) -> Optional[str]:
         """Process the request using agent's specific logic."""
-        group_context = ""
+        from src.agents_tg.services.chat_history import chat_history
+        from src.agents_tg.services.environment_context import build_environment
+
+        user_id = str(message.from_user.id) if message.from_user else "default"
+
         if is_group:
-            group_context = coordinator.get_recent_context(message.chat.id, 8)
+            group_context = coordinator.get_recent_context(message.chat.id, 18)
             if group_context:
                 user_text = (
                     f"Контекст группового чата:\n{group_context}\n\n"
                     f"Запрос пользователя: {user_text}"
                 )
+            dm_recent = ""
+        else:
+            turns = await chat_history.get_recent(user_id, self.agent_key)
+            dm_recent = chat_history.format_for_prompt(turns)
+
+        environment = await build_environment(
+            message=message,
+            agent_key=self.agent_key,
+            coordinator=coordinator if is_group else None,
+            tool_names=self._tool_names_for_agent(),
+            dm_recent=dm_recent,
+            group_context_lines=18,
+        )
 
         if self.agent_key == "orchestrator":
             from src.agents_tg.agents.orchestrator import orchestrator
 
             return await orchestrator.process(
                 user_text,
-                user_id=str(message.from_user.id),
+                user_id=user_id,
+                environment=environment,
             )
         elif self.agent_key == "personal_assistant":
             from src.agents_tg.agents.personal_assistant import personal_assistant
 
             return await personal_assistant.process(
-                user_text, user_id=str(message.from_user.id)
+                user_text,
+                user_id=user_id,
+                environment=environment,
             )
         else:
             from src.agents_tg.agents.specialists import (
@@ -312,7 +351,8 @@ class AgentBot:
             if agent:
                 return await agent.process(
                     user_text,
-                    user_id=str(message.from_user.id),
+                    user_id=user_id,
+                    environment=environment,
                 )
 
         return None

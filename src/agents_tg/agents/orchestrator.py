@@ -17,6 +17,10 @@ from src.agents_tg.agents.specialists import (
     research_analyst,
     security_ai,
 )
+from src.agents_tg.services.agent_prompts import (
+    TELEGRAM_AGENT_PROTOCOL,
+    TELEGRAM_HTML_FORMAT,
+)
 from src.agents_tg.services.memory_service import memory_service
 from src.agents_tg.services.qwen_client import qwen_client
 
@@ -32,6 +36,7 @@ class AgentState(TypedDict):
     plan: List[str]
     current_step: int
     direct_reply: str
+    environment_block: str
 
 
 ORCHESTRATOR_SYSTEM_PROMPT = (
@@ -39,7 +44,8 @@ ORCHESTRATOR_SYSTEM_PROMPT = (
     "Пойми цель сообщения:\n"
     "- Приветствие, small talk, «кто ты», «ты помнишь меня» → ответь САМ "
     '(next_agent: "end", заполни direct_reply).\n'
-    "- Явная задача для специалиста → делегируй одному агенту.\n"
+    "- Явная задача для специалиста → делегируй одному агенту. "
+    "Сам не ищи в интернете и не создавай заметки.\n"
     "- Не делегируй приветствие Эльзе — это твоя зона.\n\n"
     "Доступные специалисты:\n"
     "1. personal_assistant — календарь, задачи, заметки Obsidian\n"
@@ -53,7 +59,7 @@ ORCHESTRATOR_SYSTEM_PROMPT = (
     "{\n"
     '  "next_agent": "personal_assistant|research|coder|security_ai|'
     'business_manager|marketing|general|end",\n'
-    '  "direct_reply": "текст ответа от Егора, если отвечаешь сам",\n'
+    '  "direct_reply": "текст ответа от Егора в Telegram HTML, если отвечаешь сам",\n'
     '  "plan": ["шаг 1", "шаг 2"],\n'
     '  "thought": "кратко почему так"\n'
     "}\n\n"
@@ -123,6 +129,7 @@ class Orchestrator:
         last_message = state["messages"][-1].content
         user_id = state.get("user_id", "default")
         orchestrator_soul = self._load_soul("orchestrator")
+        env_block = state.get("environment_block", "")
 
         memories = await memory_service.search(last_message, user_id=user_id)
         memory_context = ""
@@ -134,7 +141,9 @@ class Orchestrator:
             {
                 "role": "system",
                 "content": (
-                    f"{orchestrator_soul}{memory_context}\n\n"
+                    f"{orchestrator_soul}{env_block}{memory_context}\n\n"
+                    f"{TELEGRAM_AGENT_PROTOCOL}\n\n"
+                    f"{TELEGRAM_HTML_FORMAT}\n\n"
                     f"{ORCHESTRATOR_SYSTEM_PROMPT}"
                 ),
             },
@@ -195,6 +204,9 @@ class Orchestrator:
             return "end"
         return state["next_agent"]
 
+    def _env_block(self, state: AgentState) -> str:
+        return state.get("environment_block", "")
+
     async def personal_assistant_node(self, state: AgentState) -> Dict[str, Any]:
         """Personal Assistant agent node."""
         from src.agents_tg.agents.personal_assistant import (
@@ -203,53 +215,94 @@ class Orchestrator:
 
         last_message = state["messages"][-1].content
         user_id = state.get("user_id", "default")
-        response = await personal_assistant.process(last_message, user_id=user_id)
+        response = await personal_assistant.process(
+            last_message,
+            user_id=user_id,
+            environment_block=self._env_block(state),
+        )
         return {"messages": [HumanMessage(content=response, name="personal_assistant")]}
 
     async def research_node(self, state: AgentState) -> Dict[str, Any]:
         """Research / Intel agent node."""
         last_message = state["messages"][-1].content
         user_id = state.get("user_id", "default")
-        response = await research_analyst.process(last_message, user_id=user_id)
+        response = await research_analyst.process(
+            last_message,
+            user_id=user_id,
+            environment_block=self._env_block(state),
+        )
         return {"messages": [HumanMessage(content=response, name="research")]}
 
     async def coder_node(self, state: AgentState) -> Dict[str, Any]:
         """Coder / Architect agent node."""
         last_message = state["messages"][-1].content
         user_id = state.get("user_id", "default")
-        response = await coder.process(last_message, user_id=user_id)
+        response = await coder.process(
+            last_message,
+            user_id=user_id,
+            environment_block=self._env_block(state),
+        )
         return {"messages": [HumanMessage(content=response, name="coder")]}
 
     async def security_ai_node(self, state: AgentState) -> Dict[str, Any]:
         """Security AI agent node."""
         last_message = state["messages"][-1].content
         user_id = state.get("user_id", "default")
-        response = await security_ai.process(last_message, user_id=user_id)
+        response = await security_ai.process(
+            last_message,
+            user_id=user_id,
+            environment_block=self._env_block(state),
+        )
         return {"messages": [HumanMessage(content=response, name="security_ai")]}
 
     async def business_manager_node(self, state: AgentState) -> Dict[str, Any]:
         """Business Manager agent node."""
         last_message = state["messages"][-1].content
         user_id = state.get("user_id", "default")
-        response = await business_manager.process(last_message, user_id=user_id)
+        response = await business_manager.process(
+            last_message,
+            user_id=user_id,
+            environment_block=self._env_block(state),
+        )
         return {"messages": [HumanMessage(content=response, name="business_manager")]}
 
     async def marketing_node(self, state: AgentState) -> Dict[str, Any]:
         """Marketing agent node."""
         last_message = state["messages"][-1].content
         user_id = state.get("user_id", "default")
-        response = await marketing.process(last_message, user_id=user_id)
+        response = await marketing.process(
+            last_message,
+            user_id=user_id,
+            environment_block=self._env_block(state),
+        )
         return {"messages": [HumanMessage(content=response, name="marketing")]}
 
     async def general_node(self, state: AgentState) -> Dict[str, Any]:
         """General chat node."""
         last_message = state["messages"][-1].content
         user_id = state.get("user_id", "default")
-        response = await general.process(last_message, user_id=user_id)
+        response = await general.process(
+            last_message,
+            user_id=user_id,
+            environment_block=self._env_block(state),
+        )
         return {"messages": [HumanMessage(content=response, name="general")]}
 
-    async def process(self, message: str, user_id: str = "default") -> str:
+    async def process(
+        self,
+        message: str,
+        user_id: str = "default",
+        environment=None,
+        environment_block: str = "",
+    ) -> str:
         """Process a message through the graph."""
+        from src.agents_tg.services.environment_context import AgentEnvironment
+
+        if isinstance(environment, AgentEnvironment):
+            env_block = environment.to_prompt_block()
+        else:
+            env_block = environment_block
+
         initial_state = {
             "messages": [HumanMessage(content=message)],
             "user_id": user_id,
@@ -257,6 +310,7 @@ class Orchestrator:
             "plan": [],
             "current_step": 0,
             "direct_reply": "",
+            "environment_block": env_block,
         }
 
         final_state = await self.app.ainvoke(initial_state)
@@ -269,7 +323,7 @@ class Orchestrator:
         plan = final_state.get("plan") or []
         if len(plan) >= 2:
             steps = "\n".join(f"{i + 1}. {step}" for i, step in enumerate(plan))
-            plan_str = f"📋 **План:**\n{steps}\n\n"
+            plan_str = f"<b>План:</b>\n{steps}\n\n"
 
         if final_state["messages"]:
             return f"{plan_str}{final_state['messages'][-1].content}"

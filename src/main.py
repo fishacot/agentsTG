@@ -33,9 +33,16 @@ async def on_startup():
         _db_engine = create_engine()
         from sqlalchemy import text
 
+        from src.agents_tg.db.init_db import init_db
+        from src.agents_tg.services.chat_history import chat_history
+        from src.agents_tg.services.memory_service import memory_service
+
         async with _db_engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-        logger.info("✅ Database connected")
+        await init_db(_db_engine)
+        chat_history.set_pg_available(True)
+        memory_service.set_pg_available(True)
+        logger.info("✅ Database connected and tables ensured")
     except Exception as e:
         logger.warning(f"⚠️ Database not available: {e}")
         logger.info("   Running without persistence")

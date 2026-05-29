@@ -6,39 +6,41 @@ from src.agents_tg.services.agent_runner import agent_runner
 logger = logging.getLogger(__name__)
 
 DEFAULT_OUTPUT = (
-    "Сформируй полезный ответ по своей специализации. "
-    "Если использовал поиск — дай ссылки и следующие шаги."
+    "Сформируй полезный ответ по специализации. "
+    "Если был deep_research — дай ссылки и следующие шаги."
 )
 
 RESEARCH_OUTPUT = (
-    "Формат ответа:\n"
-    "- Находки со ссылками\n"
-    "- Почему подходит\n"
-    "- Риски\n"
-    "- Следующие шаги (3–7 пунктов)"
+    "Формат (Telegram HTML):\n"
+    "<b>Находки</b> — список ссылок\n"
+    "<b>Почему подходит</b>\n"
+    "<b>Риски</b>\n"
+    "<b>Следующие шаги</b> — 3–7 пунктов"
 )
 
 SECURITY_OUTPUT = (
-    "Формат: риски (Severity), рекомендации, чеклист проверок. "
-    "Не давай инструкций для вредоносных действий."
+    "Формат HTML: <b>Риски</b> (Severity), <b>Рекомендации</b>, <b>Чеклист</b>. "
+    "Без инструкций для вредоносных действий. Без юридических вердиктов."
 )
 
 BUSINESS_OUTPUT = (
-    "Формат: цель, гипотезы, план MVP, риски. Учитывай бюджет 0."
+    "Формат HTML: <b>Цель</b>, <b>Гипотезы</b>, <b>План MVP</b>, <b>Риски</b>. "
+    "Бюджет 0."
 )
 
 MARKETING_OUTPUT = (
-    "Формат: позиционирование, ЦА, УТП, идеи контента, каналы роста."
+    "Формат HTML: <b>Позиционирование</b>, <b>ЦА</b>, <b>УТП</b>, "
+    "<b>Контент</b>, <b>Каналы</b>."
 )
 
 CODER_OUTPUT = (
-    "Формат: резюме проблемы, архитектура/подход, пример кода если уместно, "
-    "подводные камни. Опиши план правок, не выполняй их сам."
+    "Формат HTML: <b>Резюме</b>, <b>Архитектура</b>, <code>код</code> в <pre> если уместно, "
+    "<b>Edge cases</b>. План правок — не выполняй сам."
 )
 
 
 class GoalOrientedAgent:
-    """Specialist agent: natural dialogue + web tools when the goal requires them."""
+    """Specialist agent: natural dialogue + deep_research when needed."""
 
     def __init__(
         self,
@@ -55,7 +57,16 @@ class GoalOrientedAgent:
             return self.soul_path.read_text(encoding="utf-8")
         return ""
 
-    async def process(self, user_message: str, user_id: str = "default") -> str:
+    async def process(
+        self,
+        user_message: str,
+        user_id: str = "default",
+        environment=None,
+        environment_block: str = "",
+    ) -> str:
+        from src.agents_tg.services.environment_context import AgentEnvironment
+
+        env = environment if isinstance(environment, AgentEnvironment) else None
         return await agent_runner.run(
             agent_key=self.agent_key,
             soul=self._load_soul(),
@@ -63,6 +74,8 @@ class GoalOrientedAgent:
             user_id=user_id,
             output_hints=self.output_hints,
             include_web_tools=True,
+            environment=env,
+            environment_block=environment_block,
             temperature=0.35,
         )
 
