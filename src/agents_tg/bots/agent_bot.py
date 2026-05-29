@@ -288,7 +288,9 @@ class AgentBot:
         elif self.agent_key == "personal_assistant":
             from src.agents_tg.agents.personal_assistant import personal_assistant
 
-            return await personal_assistant.process(user_text)
+            return await personal_assistant.process(
+                user_text, user_id=str(message.from_user.id)
+            )
         else:
             from src.agents_tg.agents.specialists import (
                 business_manager,

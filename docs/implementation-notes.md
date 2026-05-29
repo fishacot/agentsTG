@@ -6,6 +6,32 @@
 
 ---
 
+## 2026-05-28 — Goal-oriented агенты (без ACTION/CREATE_NOTE классификации)
+
+- **Проблема:** Эльза на «ты можешь запоминать?» создавала заметку `[Title]` — жёсткая классификация CREATE_NOTE/CHAT.
+- **Решение:** единый `AgentRunner` + LLM **function calling** (Groq tools):
+  - модель сама решает: разговор или инструмент;
+  - Эльза: `create_obsidian_note`, `add_task`, `list_tasks`, `remember_about_user`;
+  - специалисты: `web_search`, `fetch_web_page`, `remember_about_user`;
+  - общий промпт `GOAL_DIRECTIVE` в `agent_prompts.py`.
+- **Память:** `memory_service` — fallback in-process `_facts_store` per user_id, если Mem0 недоступен; поиск работает без облака.
+- **Оркестратор:** приветствия/small talk → `direct_reply` от Егора; план показывается только при 2+ шагах.
+- **LLM-вызовов:** было ~3 на сообщение (intent + answer + classify); стало ~1 (+ tool rounds при необходимости).
+- **Файлы:** `agent_runner.py`, `agent_prompts.py`, `qwen_client.chat_completion`, `personal_assistant.py`, `specialists.py`, `orchestrator.py`, `memory_service.py`, тесты.
+- **Verify:** pytest 14 passed.
+- **TODO:** история диалога (multi-turn) в runner; Mem0 на VPS; перенос правок из `AGENT_PERSONALITIES.md`.
+
+---
+
+## 2026-05-28 — Черновик личностей агентов + объяснение routing
+
+- **Запрос:** пользователь написал «привет» Егору, получил план + ответ Эльзы.
+- **Причина:** оркестратор делегирует supervisor → specialist; `process()` склеивает plan + последнее сообщение specialist.
+- **Не баг кода:** текущий дизайн; поведение менять после правок пользователя в `docs/AGENT_PERSONALITIES.md`.
+- **Файл для правок:** `docs/AGENT_PERSONALITIES.md` — человеческие описания ролей, тона, границ, примеры.
+
+---
+
 ## 2026-05-28 — Groq 429: меньше вызовов + retry
 
 - **Симптом на VPS:** `QwenAPIError: API error (llama-3.1-8b-instant): 429` в `general_node` → `_final_answer`.

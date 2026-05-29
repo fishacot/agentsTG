@@ -31,37 +31,34 @@ class AgentState(TypedDict):
     user_id: str
     plan: List[str]
     current_step: int
+    direct_reply: str
 
 
 ORCHESTRATOR_SYSTEM_PROMPT = (
-    "Ты - Оркестратор мультиагентной системы.\n"
-    "Твоя задача - проанализировать запрос пользователя, "
-    "составить план действий и делегировать задачи.\n\n"
-    "ФИЛОСОФИЯ (Mens et Manus):\n"
-    "Мы не просто отвечаем на вопросы, мы ДОСТАВЛЯЕМ результат. "
-    "Если пользователь просит информацию - мы создаем заметку. "
-    "Если просит проект - мы ищем ресурсы и составляем план.\n\n"
-    "ТВОЙ АЛГОРИТМ:\n"
-    "1. Пойми намерение пользователя.\n"
-    "2. Составь краткий план (Plan) из 2-3 шагов.\n"
-    "3. Выбери первого агента для выполнения шага 1.\n\n"
-    "Доступные агенты (специалисты):\n"
-    "1. **personal_assistant** - управление временем, задачи, "
-    "заметки в Obsidian, календарь, лёгкий личный бюджет.\n"
-    "2. **research** - ресерч и аналитика: найти репозитории, "
-    "best practices, конкурентов, собрать выжимку.\n"
-    "3. **coder** - код, архитектура, ревью, подсказки по реализации.\n"
-    "4. **security_ai** - безопасность ИИ, уязвимости LLM, "
-    "безопасная архитектура, помощь в кодинге.\n"
-    "5. **business_manager** - проекты, бизнес-идеи, продукт, "
-    "приоритизация, риски, план запуска.\n"
-    "6. **marketing** - маркетинг, позиционирование, тональность, "
-    "контент, рост аудитории.\n\n"
-    "ФОРМАТ ОТВЕТА (строго JSON):\n"
-    '{\n  "plan": ["шаг 1", "шаг 2"],\n'
-    '  "next_agent": "имя_агента",\n'
-    '  "thought": "почему выбран этот агент"\n}\n\n'
-    'Если задача выполнена, напиши "next_agent": "end".'
+    "Ты — Егор, оркестратор команды. Пользователь пишет обычным языком.\n\n"
+    "Пойми цель сообщения:\n"
+    "- Приветствие, small talk, «кто ты», «ты помнишь меня» → ответь САМ "
+    '(next_agent: "end", заполни direct_reply).\n'
+    "- Явная задача для специалиста → делегируй одному агенту.\n"
+    "- Не делегируй приветствие Эльзе — это твоя зона.\n\n"
+    "Доступные специалисты:\n"
+    "1. personal_assistant — календарь, задачи, заметки Obsidian\n"
+    "2. research — поиск, аналитика, ссылки\n"
+    "3. coder — код, архитектура, ревью\n"
+    "4. security_ai — безопасность, аудит\n"
+    "5. business_manager — бизнес, MVP, приоритеты\n"
+    "6. marketing — маркетинг, контент\n"
+    "7. general — общий вопрос вне узкой специализации\n\n"
+    "ФОРМАТ ОТВЕТА (строго JSON, без markdown):\n"
+    "{\n"
+    '  "next_agent": "personal_assistant|research|coder|security_ai|'
+    'business_manager|marketing|general|end",\n'
+    '  "direct_reply": "текст ответа от Егора, если отвечаешь сам",\n'
+    '  "plan": ["шаг 1", "шаг 2"],\n'
+    '  "thought": "кратко почему так"\n'
+    "}\n\n"
+    "plan — только для многошаговых задач (2+ шага). "
+    "На приветствие plan = []."
 )
 
 
@@ -171,10 +168,12 @@ class Orchestrator:
             data = json.loads(clean_response)
             next_agent = data.get("next_agent", "general")
             plan = data.get("plan", state.get("plan", []))
+            direct_reply = (data.get("direct_reply") or "").strip()
 
             return {
                 "next_agent": next_agent,
                 "plan": plan,
+                "direct_reply": direct_reply,
                 "current_step": state.get("current_step", 0) + 1,
             }
         except Exception as e:
@@ -185,12 +184,15 @@ class Orchestrator:
             )
             return {
                 "next_agent": "general",
-                "plan": ["Обработать запрос"],
+                "plan": [],
+                "direct_reply": "",
                 "current_step": 1,
             }
 
     def router(self, state: AgentState) -> str:
         """Routing logic based on next_agent state."""
+        if state.get("direct_reply") and state.get("next_agent") in ("end", ""):
+            return "end"
         return state["next_agent"]
 
     async def personal_assistant_node(self, state: AgentState) -> Dict[str, Any]:
@@ -200,7 +202,8 @@ class Orchestrator:
         )
 
         last_message = state["messages"][-1].content
-        response = await personal_assistant.process(last_message)
+        user_id = state.get("user_id", "default")
+        response = await personal_assistant.process(last_message, user_id=user_id)
         return {"messages": [HumanMessage(content=response, name="personal_assistant")]}
 
     async def research_node(self, state: AgentState) -> Dict[str, Any]:
@@ -253,16 +256,20 @@ class Orchestrator:
             "next_agent": "",
             "plan": [],
             "current_step": 0,
+            "direct_reply": "",
         }
 
         final_state = await self.app.ainvoke(initial_state)
 
+        direct = (final_state.get("direct_reply") or "").strip()
+        if direct:
+            return direct
+
         plan_str = ""
-        if final_state.get("plan"):
-            steps = "\n".join(
-                [f"{i+1}. {step}" for i, step in enumerate(final_state["plan"])]
-            )
-            plan_str = f"📋 **План действий:**\n{steps}\n\n"
+        plan = final_state.get("plan") or []
+        if len(plan) >= 2:
+            steps = "\n".join(f"{i + 1}. {step}" for i, step in enumerate(plan))
+            plan_str = f"📋 **План:**\n{steps}\n\n"
 
         if final_state["messages"]:
             return f"{plan_str}{final_state['messages'][-1].content}"

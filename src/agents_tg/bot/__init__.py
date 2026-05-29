@@ -187,7 +187,9 @@ async def cmd_pa(message: Message, state: FSMContext) -> None:
     from src.agents_tg.agents.personal_assistant import personal_assistant
 
     await state.set_state(BotStates.idle)
-    response = await personal_assistant.process(message.text or "")
+    response = await personal_assistant.process(
+        message.text or "", user_id=str(message.from_user.id)
+    )
     await message.answer(response)
 
 

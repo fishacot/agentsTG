@@ -3,7 +3,10 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from mem0 import Memory
+try:
+    from mem0 import Memory
+except ImportError:  # pragma: no cover - optional in minimal envs
+    Memory = None  # type: ignore[misc, assignment]
 
 from src.agents_tg.config.settings import get_settings
 
@@ -15,62 +18,89 @@ class MemoryService:
     """Service to manage long-term memory for users."""
 
     def __init__(self) -> None:
-        # If MEM0_API_KEY is provided, it uses the managed cloud service
-        # Otherwise, it can work with local vector stores (qdrant/chroma)
         config = {}
         if settings.MEM0_API_KEY:
             config["api_key"] = settings.MEM0_API_KEY
 
         try:
-            self.memory = Memory.from_config(config)
+            if Memory is not None:
+                self.memory = Memory.from_config(config)
+            else:
+                self.memory = None
         except Exception as e:
-            logger.error(f"Failed to initialize Mem0: {e}. Using fallback memory.")
+            logger.error("Failed to initialize Mem0: %s. Using fallback memory.", e)
             self.memory = None
 
-        # Simple in-process fallback journal, если Mem0 недоступен.
+        # Fallback: in-process facts per user when Mem0/cloud unavailable.
         self._journal_store: Dict[str, list[dict[str, Any]]] = {}
+        self._facts_store: Dict[str, list[str]] = {}
 
     async def add(
         self, data: str, user_id: str, metadata: Optional[Dict[str, Any]] = None
     ) -> None:
         """Add information to user memory."""
+        text = data.strip()
+        if not text:
+            return
+
+        self._facts_store.setdefault(user_id, [])
+        if text not in self._facts_store[user_id]:
+            self._facts_store[user_id].append(text)
+            if len(self._facts_store[user_id]) > 100:
+                self._facts_store[user_id] = self._facts_store[user_id][-100:]
+
         if self.memory:
             try:
-                self.memory.add(data, user_id=user_id, metadata=metadata or {})
+                self.memory.add(text, user_id=user_id, metadata=metadata or {})
             except Exception as e:
-                logger.error(f"Error adding to memory: {e}")
+                logger.error("Error adding to memory: %s", e)
 
-        # Журналируем факт даже без Mem0.
         await self.add_journal_entry(
             user_id=user_id,
             agent=metadata.get("agent") if metadata else None,
             event="memory_add",
-            payload={"text": data},
+            payload={"text": text},
         )
 
     async def search(
         self, query: str, user_id: str, limit: int = 5
     ) -> List[Dict[str, Any]]:
-        """Search in user memory."""
-        if not self.memory:
+        """Search in user memory (Mem0 or local fallback)."""
+        if self.memory:
+            try:
+                results = self.memory.search(query, user_id=user_id, limit=limit)
+                if results:
+                    return results
+            except Exception as e:
+                logger.error("Error searching memory: %s", e)
+
+        return self._fallback_search(query, user_id, limit)
+
+    def _fallback_search(
+        self, query: str, user_id: str, limit: int
+    ) -> List[Dict[str, Any]]:
+        facts = self._facts_store.get(user_id, [])
+        if not facts:
             return []
 
-        try:
-            return self.memory.search(query, user_id=user_id, limit=limit)
-        except Exception as e:
-            logger.error(f"Error searching memory: {e}")
-            return []
+        q = query.lower().strip()
+        if not q or len(q) < 3:
+            selected = facts[-limit:]
+        else:
+            matched = [f for f in facts if q in f.lower()]
+            selected = matched[-limit:] if matched else facts[-limit:]
+
+        return [{"text": fact} for fact in selected]
 
     async def get_all(self, user_id: str) -> List[Dict[str, Any]]:
         """Retrieve all memories for a user."""
-        if not self.memory:
-            return []
+        if self.memory:
+            try:
+                return self.memory.get_all(user_id=user_id)
+            except Exception as e:
+                logger.error("Error getting all memories: %s", e)
 
-        try:
-            return self.memory.get_all(user_id=user_id)
-        except Exception as e:
-            logger.error(f"Error getting all memories: {e}")
-            return []
+        return [{"text": f} for f in self._facts_store.get(user_id, [])]
 
     async def add_journal_entry(
         self,
@@ -95,5 +125,4 @@ class MemoryService:
         return list(self._journal_store.get(key, []))
 
 
-# Singleton instance
 memory_service = MemoryService()

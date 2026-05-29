@@ -51,6 +51,26 @@ class QwenClient:
         agent_key: str | None = None,
     ) -> str:
         """Send chat request to Groq or Hugging Face Inference API."""
+        result = await self.chat_completion(
+            messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            model=model,
+            agent_key=agent_key,
+        )
+        return (result.get("content") or "").strip()
+
+    async def chat_completion(
+        self,
+        messages: list[dict[str, Any]],
+        temperature: float = 0.7,
+        max_tokens: int = 512,
+        model: str | None = None,
+        agent_key: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Return assistant message dict: content, tool_calls."""
         resolved_model = model or (
             self.model_for_agent(agent_key) if agent_key else self.default_model
         )
@@ -61,9 +81,14 @@ class QwenClient:
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = tool_choice if tool_choice is not None else "auto"
 
         async with _LLM_SEMAPHORE:
-            return await self._post_with_retry(resolved_model, payload)
+            raw = await self._post_with_retry(resolved_model, payload)
+
+        return self._extract_message(raw)
 
     async def _post_with_retry(
         self,
@@ -78,7 +103,7 @@ class QwenClient:
             try:
                 response = await session.post(self.api_base, json=payload)
                 response.raise_for_status()
-                return self._extract_text(response.json())
+                return response.json()
             except httpx.HTTPStatusError as e:
                 last_error = e
                 if (
@@ -111,6 +136,23 @@ class QwenClient:
 
         logger.error("LLM request failed model=%s: %s", resolved_model, last_error)
         raise QwenAPIError(f"Request failed: {last_error}") from last_error
+
+    @staticmethod
+    def _extract_message(result: Any) -> dict[str, Any]:
+        """Parse OpenAI-compatible chat completion message."""
+        if isinstance(result, dict):
+            choices = result.get("choices")
+            if isinstance(choices, list) and choices:
+                message = choices[0].get("message") or {}
+                content = message.get("content")
+                tool_calls = message.get("tool_calls")
+                return {
+                    "content": str(content).strip() if content else "",
+                    "tool_calls": tool_calls or [],
+                }
+            text = QwenClient._extract_text(result)
+            return {"content": text, "tool_calls": []}
+        return {"content": str(result), "tool_calls": []}
 
     @staticmethod
     def _extract_text(result: Any) -> str:
