@@ -6,7 +6,25 @@
 
 ---
 
-## 2026-05-30 — OpenClaw shared memory + project focus (verify)
+## 2026-05-30 — Hotfix: Эльза молчит в DM (debounce deadlock) ✅
+
+- **Симптом:** после деплоя `64e6001` личные сообщения `@elliza_pa_bot` — полная тишина, нет даже «🤖 Думаю…»; в логах `Update … Duration 27 ms`, нет `inbound_start`.
+- **Причина:** `message_pipeline.enqueue_debounced` оборачивал handler в `run_lock`, а `_handle_inbound` в `agent_bot.py` берёт тот же lock → **deadlock** на DM (MESSAGE_DEBOUNCE_MS=2000).
+- **Фикс:** убран внешний `run_lock` из `_flush`; handler сам сериализует чат.
+- **Файлы:** `src/agents_tg/services/message_pipeline.py`, `tests/test_message_pipeline.py`
+- **VPS:** hotfix залит SFTP + `systemctl restart agents-tg` → **active**
+- **Verify:** `pytest tests/test_message_pipeline.py` — 3 passed
+
+## 2026-05-30 — Push + VPS deploy OpenClaw (64e6001)
+
+- **Git:** `64e6001` feat(openclaw): shared memory + project focus — pushed to `origin/master`
+- **Fix перед push:** `.env` случайно попал в commit → GitHub push protection (Groq/GCP keys). Пересобран commit без `.env`; добавлен `.env` в `.gitignore`
+- **VPS (91.186.221.32):** `git reset --hard origin/master` → `64e6001`; `agents-tg` **active**
+- **Alembic на VPS:** `alembic` не в PATH при deploy — миграции shared_context не накатаны; без `DATABASE_URL` работает in-memory fallback
+- **Health :8080:** проверить после старта (`curl http://127.0.0.1:8080/`)
+- **Smoke TG:** Егор «сайт о собаках», Эльза «привет» — см. `docs/E2E_AUTONOMY.md` W3
+
+---
 
 - **Schema:** `user_profiles`, `user_projects`, `project_activity`; `user_facts.category`; alembic `c3d5f7a2b104`
 - **Services:** `shared_context.py`, `bootstrap_context.py`, `workspace_memory.py`, `orchestrator_project.py`, `shared_context_tools.py`, `check_in_cooldown.py`

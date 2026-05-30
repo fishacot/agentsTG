@@ -36,3 +36,24 @@ async def test_followup_queue_while_busy():
     pipe._busy["coder:42"] = False
     await pipe.drain_followups("coder", 42)
     assert processed == ["queued"]
+
+
+@pytest.mark.asyncio
+async def test_debounce_flush_calls_handler_after_delay():
+    """DM debounce must invoke handler (regression: double run_lock caused deadlock)."""
+    pipe = MessagePipeline(debounce_ms=50)
+    processed: list[str | None] = []
+
+    class Msg:
+        chat = type("C", (), {"id": 42})()
+        from_user = type("U", (), {"id": 7})()
+        message_id = 1
+        text = "hi"
+
+    async def handler(msg, *, combined_text=None):
+        processed.append(combined_text or msg.text)
+
+    msg = Msg()
+    await pipe.enqueue_debounced(agent_key="coder", message=msg, handler=handler)
+    await asyncio.sleep(0.15)
+    assert processed == ["hi"]

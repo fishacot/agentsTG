@@ -203,9 +203,9 @@ class MessagePipeline:
                     combined_text=combined or None,
                 )
                 return
-            async with self.run_lock(agent_key, chat_id):
-                await handler(b.last_message, combined_text=combined or None)
-                await self.drain_followups(agent_key, chat_id)
+            # Handler (_handle_inbound) acquires run_lock itself; do not wrap here
+            # or asyncio.Lock deadlocks on DM debounce path.
+            await handler(b.last_message, combined_text=combined or None)
 
         batch.task = asyncio.create_task(_flush())
 
