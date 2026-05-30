@@ -31,8 +31,17 @@ class TestAppSettings:
         assert settings.ROOT_DIR.exists()
         assert (settings.ROOT_DIR / "pyproject.toml").exists()
 
-    def test_src_dir(self):
-        """Verify SRC_DIR property points to src/."""
+    def test_llm_provider_chain_default(self):
         settings = AppSettings()
-        assert settings.SRC_DIR == settings.ROOT_DIR / "src"
-        assert settings.SRC_DIR.exists()
+        assert settings.llm_provider_chain_list == ["gemini", "groq"]
+
+    def test_llm_provider_chain_override(self, monkeypatch):
+        monkeypatch.setenv("LLM_PROVIDER_CHAIN", "groq,gemini")
+        settings = AppSettings()
+        assert settings.llm_provider_chain_list == ["groq", "gemini"]
+
+    def test_gemini_defaults(self, monkeypatch):
+        monkeypatch.setenv("GEMINI_API_KEY", "test-gemini")
+        settings = AppSettings()
+        assert "generativelanguage.googleapis.com" in settings.GEMINI_API_BASE
+        assert settings.GEMINI_MODEL == "gemini-2.5-flash"

@@ -1,5 +1,7 @@
 # Деплой на Timeweb Cloud VPS (Амстердам)
 
+> **Production (FirstByte FI):** см. [`FIRSTBYTE_VPS.md`](FIRSTBYTE_VPS.md) — IP `91.186.221.32`, `/opt/agentsTG`.
+
 ## 1. Покупка VPS
 
 1. Перейди на https://cloud.timeweb.com/
@@ -54,6 +56,20 @@ BOT_TOKEN_MARKETING=your_marketing_bot_token
 GROUP_CHAT_ID=your_group_chat_id
 QWEN_API_KEY=your_qwen_api_key_here
 ```
+
+### Gemini API (recommended primary LLM)
+
+1. Open https://aistudio.google.com/apikey
+2. Create API key (no credit card on free tier)
+3. Add to `.env`:
+
+```
+GEMINI_API_KEY=your_key_here
+LLM_PROVIDER_CHAIN=gemini,groq
+GROQ_API_KEY=your_groq_key_here
+```
+
+Gemini free tier offers much higher TPM than Groq (better for long system prompts + tools).
 
 ## 4. Systemd сервис (автозапуск)
 

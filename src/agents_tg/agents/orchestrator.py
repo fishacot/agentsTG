@@ -1,6 +1,5 @@
 """Orchestrator Agent using LangGraph for multi-agent coordination."""
 
-import json
 import logging
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, TypedDict
@@ -18,11 +17,18 @@ from src.agents_tg.agents.specialists import (
     security_ai,
 )
 from src.agents_tg.services.agent_prompts import (
-    TELEGRAM_AGENT_PROTOCOL,
-    TELEGRAM_HTML_FORMAT,
+    ORCHESTRATOR_DIRECT_REPLY_HTML,
+    ORCHESTRATOR_JSON_DIRECTIVE,
 )
+from src.agents_tg.services.llm_client import llm_client
 from src.agents_tg.services.memory_service import memory_service
-from src.agents_tg.services.qwen_client import qwen_client
+from src.agents_tg.services.capability_templates import build_egor_greeting_html
+from src.agents_tg.services.prompt_builder import (
+    PromptTier,
+    is_pure_greeting,
+    trim_env_block,
+)
+from src.agents_tg.services.supervisor_parse import parse_supervisor_response
 
 logger = logging.getLogger(__name__)
 
@@ -39,32 +45,16 @@ class AgentState(TypedDict):
     environment_block: str
 
 
-ORCHESTRATOR_SYSTEM_PROMPT = (
-    "Ты — Егор, оркестратор команды. Пользователь пишет обычным языком.\n\n"
-    "Пойми цель сообщения:\n"
-    "- Приветствие, small talk, «кто ты», «ты помнишь меня» → ответь САМ "
-    '(next_agent: "end", заполни direct_reply).\n'
-    "- Явная задача для специалиста → делегируй одному агенту. "
-    "Сам не ищи в интернете и не создавай заметки.\n"
-    "- Не делегируй приветствие Эльзе — это твоя зона.\n\n"
-    "Доступные специалисты:\n"
-    "1. personal_assistant — календарь, задачи, заметки Obsidian\n"
-    "2. research — поиск, аналитика, ссылки\n"
-    "3. coder — код, архитектура, ревью\n"
-    "4. security_ai — безопасность, аудит\n"
-    "5. business_manager — бизнес, MVP, приоритеты\n"
-    "6. marketing — маркетинг, контент\n"
-    "7. general — общий вопрос вне узкой специализации\n\n"
-    "ФОРМАТ ОТВЕТА (строго JSON, без markdown):\n"
-    "{\n"
-    '  "next_agent": "personal_assistant|research|coder|security_ai|'
-    'business_manager|marketing|general|end",\n'
-    '  "direct_reply": "текст ответа от Егора в Telegram HTML, если отвечаешь сам",\n'
-    '  "plan": ["шаг 1", "шаг 2"],\n'
-    '  "thought": "кратко почему так"\n'
-    "}\n\n"
-    "plan — только для многошаговых задач (2+ шага). "
-    "На приветствие plan = []."
+ORCHESTRATOR_ROUTING_PROMPT = (
+    "Специалисты:\n"
+    "personal_assistant — задачи, заметки\n"
+    "research — поиск, ссылки\n"
+    "coder — код, архитектура\n"
+    "security_ai — безопасность\n"
+    "business_manager — бизнес, MVP\n"
+    "marketing — маркетинг\n"
+    "general — общий вопрос\n"
+    "end — ответь сам (приветствие, small talk)\n"
 )
 
 
@@ -129,22 +119,24 @@ class Orchestrator:
         last_message = state["messages"][-1].content
         user_id = state.get("user_id", "default")
         orchestrator_soul = self._load_soul("orchestrator")
-        env_block = state.get("environment_block", "")
+        env_block = trim_env_block(state.get("environment_block", ""), PromptTier.STANDARD)
 
-        memories = await memory_service.search(last_message, user_id=user_id)
+        memories = await memory_service.search(last_message, user_id=user_id, limit=4)
         memory_context = ""
         if memories:
-            memory_lines = "\n".join([f"- {m['text']}" for m in memories])
-            memory_context = f"\n\nРЕКОРДЫ ПАМЯТИ (Mem0):\n{memory_lines}"
+            memory_lines = "\n".join([f"- {m['text']}" for m in memories[:4]])
+            memory_context = f"\n\nПАМЯТЬ:\n{memory_lines}"
+
+        soul_short = "\n".join(orchestrator_soul.splitlines()[:18])
 
         messages = [
             {
                 "role": "system",
                 "content": (
-                    f"{orchestrator_soul}{env_block}{memory_context}\n\n"
-                    f"{TELEGRAM_AGENT_PROTOCOL}\n\n"
-                    f"{TELEGRAM_HTML_FORMAT}\n\n"
-                    f"{ORCHESTRATOR_SYSTEM_PROMPT}"
+                    f"{soul_short}\n{env_block}{memory_context}\n\n"
+                    f"{ORCHESTRATOR_JSON_DIRECTIVE}\n"
+                    f"{ORCHESTRATOR_DIRECT_REPLY_HTML}\n\n"
+                    f"{ORCHESTRATOR_ROUTING_PROMPT}"
                 ),
             },
             {"role": "user", "content": last_message},
@@ -161,42 +153,53 @@ class Orchestrator:
             )
             messages.append({"role": "assistant", "content": plan_status})
 
-        response = await qwen_client.chat(
+        response = await llm_client.chat(
             messages,
             temperature=0.1,
+            max_tokens=400,
             agent_key="orchestrator",
+            response_format={"type": "json_object"},
         )
 
         try:
-            clean_response = response.strip()
-            if "```json" in clean_response:
-                clean_response = (
-                    clean_response.split("```json")[1].split("```")[0].strip()
-                )
-
-            data = json.loads(clean_response)
-            next_agent = data.get("next_agent", "general")
-            plan = data.get("plan", state.get("plan", []))
-            direct_reply = (data.get("direct_reply") or "").strip()
-
-            return {
-                "next_agent": next_agent,
-                "plan": plan,
-                "direct_reply": direct_reply,
-                "current_step": state.get("current_step", 0) + 1,
-            }
+            data = parse_supervisor_response(response)
         except Exception as e:
-            logger.error(
-                "Error parsing supervisor response: %s. Raw: %s",
+            logger.warning(
+                "Supervisor JSON parse failed: %s — retry plain. Raw: %s",
                 e,
-                response,
+                response[:300],
             )
-            return {
-                "next_agent": "general",
-                "plan": [],
-                "direct_reply": "",
-                "current_step": 1,
-            }
+            response = await llm_client.chat(
+                messages,
+                temperature=0.1,
+                max_tokens=400,
+                agent_key="orchestrator",
+            )
+            try:
+                data = parse_supervisor_response(response)
+            except Exception as e2:
+                logger.error(
+                    "Error parsing supervisor response: %s. Raw: %s",
+                    e2,
+                    response,
+                )
+                return {
+                    "next_agent": "general",
+                    "plan": [],
+                    "direct_reply": "",
+                    "current_step": 1,
+                }
+
+        next_agent = data.get("next_agent", "general")
+        plan = data.get("plan", state.get("plan", []))
+        direct_reply = (data.get("direct_reply") or "").strip()
+
+        return {
+            "next_agent": next_agent,
+            "plan": plan,
+            "direct_reply": direct_reply,
+            "current_step": state.get("current_step", 0) + 1,
+        }
 
     def router(self, state: AgentState) -> str:
         """Routing logic based on next_agent state."""
@@ -302,6 +305,9 @@ class Orchestrator:
             env_block = environment.to_prompt_block()
         else:
             env_block = environment_block
+
+        if is_pure_greeting(message):
+            return build_egor_greeting_html()
 
         initial_state = {
             "messages": [HumanMessage(content=message)],

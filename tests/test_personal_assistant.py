@@ -32,3 +32,16 @@ async def test_create_note(pa: PersonalAssistant) -> None:
 async def test_invalid_note_title_rejected(pa: PersonalAssistant) -> None:
     result = await pa.create_obsidian_note("[Title]", "x")
     assert result["ok"] is False
+
+
+@pytest.mark.asyncio
+async def test_capabilities_faq_no_llm(pa: PersonalAssistant, monkeypatch) -> None:
+    from unittest.mock import AsyncMock, patch
+
+    with patch(
+        "src.agents_tg.agents.personal_assistant.agent_runner.run",
+        new_callable=AsyncMock,
+    ) as mock_run:
+        reply = await pa.process("расскажи что ты можешь", user_id="u1")
+        mock_run.assert_not_called()
+        assert "<b>Я Эльза</b>" in reply

@@ -8,18 +8,19 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
-from src.agents_tg.services.agent_prompts import (
-    FINALIZE_USER_REPLY,
-    GOAL_DIRECTIVE,
-    TELEGRAM_AGENT_PROTOCOL,
-    TELEGRAM_HTML_FORMAT,
-    WEB_TOOL_HINT,
-)
+from src.agents_tg.services.agent_prompts import FINALIZE_USER_REPLY
 from src.agents_tg.services.agent_identity import get_agent_identity
 from src.agents_tg.services.chat_history import chat_history
 from src.agents_tg.services.environment_context import AgentEnvironment
+from src.agents_tg.services.llm_client import llm_client
 from src.agents_tg.services.memory_service import memory_service
-from src.agents_tg.services.qwen_client import qwen_client
+from src.agents_tg.services.prompt_builder import (
+    PromptTier,
+    build_memory_block,
+    build_system_prompt,
+    detect_prompt_tier,
+    tools_for_tier,
+)
 from src.agents_tg.services.search_provider import deep_research
 
 logger = logging.getLogger(__name__)
@@ -51,24 +52,6 @@ def _openai_tool(tool: AgentTool) -> dict[str, Any]:
             "parameters": tool.parameters,
         },
     }
-
-
-async def _memory_block(user_message: str, user_id: str) -> str:
-    memories = await memory_service.search(user_message, user_id=user_id, limit=8)
-    if not memories:
-        return (
-            "\n\nПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ:\n"
-            "Пока нет сохранённых фактов. Используй remember_about_user, "
-            "когда пользователь сообщает факт о себе.\n"
-        )
-    lines = []
-    for item in memories:
-        text = item.get("text") or item.get("memory") or ""
-        if text:
-            lines.append(f"- {text}")
-    if not lines:
-        return ""
-    return "\n\nПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ:\n" + "\n".join(lines)
 
 
 def _remember_tool(agent_key: str) -> AgentTool:
@@ -161,12 +144,15 @@ class AgentRunner:
         human_name = identity.get("human_name") or agent_key
         designation = identity.get("designation") or ""
 
+        tier = detect_prompt_tier(user_message, include_web_tools=include_web_tools)
+        if tier == PromptTier.LIGHT:
+            max_tokens = min(max_tokens, 512)
+
         tool_list = list(tools or [])
         tool_list.append(_remember_tool(agent_key))
-        if include_web_tools:
+        if include_web_tools and tier == PromptTier.FULL:
             tool_list.append(deep_research_tool())
 
-        tool_names = [t.name for t in tool_list]
         if environment:
             env_block = environment.to_prompt_block()
         elif environment_block:
@@ -174,34 +160,44 @@ class AgentRunner:
         else:
             env_block = ""
 
-        memory_ctx = await _memory_block(user_message, user_id)
-        hints = f"\n\n{output_hints}" if output_hints else ""
-        web_hint = f"\n\n{WEB_TOOL_HINT}" if include_web_tools else ""
-
-        history_turns = await chat_history.get_recent(user_id, agent_key)
-        history_block = chat_history.format_for_prompt(history_turns)
-        if history_block:
-            history_block = f"\n\n## НЕДАВНИЙ ДИАЛОГ\n{history_block}\n"
-
-        system = (
-            f"{GOAL_DIRECTIVE}\n\n"
-            f"{TELEGRAM_AGENT_PROTOCOL}\n\n"
-            f"{TELEGRAM_HTML_FORMAT}\n\n"
-            f"Ты — <b>{human_name}</b>, {designation}.\n\n"
-            f"{soul}{env_block}{history_block}{memory_ctx}{web_hint}{hints}\n\n"
-            f"user_id для инструментов: {user_id}"
+        memory_ctx = await build_memory_block(
+            user_message,
+            user_id,
+            tier,
+            memory_service.search,
         )
 
+        history_turns = await chat_history.get_recent(
+            user_id,
+            agent_key,
+            limit=6 if tier == PromptTier.LIGHT else 12,
+        )
+        history_raw = chat_history.format_for_prompt(history_turns)
+
+        system = build_system_prompt(
+            tier=tier,
+            human_name=human_name,
+            designation=designation,
+            soul=soul,
+            env_block=env_block,
+            history_block=history_raw,
+            memory_block=memory_ctx,
+            output_hints=output_hints,
+            include_web_tools=include_web_tools,
+            user_id=user_id,
+        )
+
+        active_tools = tools_for_tier(tool_list, tier)
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": system},
             {"role": "user", "content": user_message},
         ]
-        openai_tools = [_openai_tool(t) for t in tool_list]
+        openai_tools = [_openai_tool(t) for t in active_tools]
         handlers = {t.name: t.handler for t in tool_list}
         tools_used = False
 
         for _ in range(self.MAX_TOOL_ROUNDS):
-            result = await qwen_client.chat_completion(
+            result = await llm_client.chat_completion(
                 messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -280,7 +276,7 @@ class AgentRunner:
         """Force a natural-language reply after tool observations."""
         finalize_messages = list(messages)
         finalize_messages.append({"role": "system", "content": FINALIZE_USER_REPLY})
-        result = await qwen_client.chat_completion(
+        result = await llm_client.chat_completion(
             finalize_messages,
             temperature=temperature,
             max_tokens=max_tokens,
@@ -290,7 +286,7 @@ class AgentRunner:
         text = (result.get("content") or "").strip()
         if text:
             return text
-        return await qwen_client.chat(
+        return await llm_client.chat(
             finalize_messages,
             temperature=temperature,
             max_tokens=max_tokens,

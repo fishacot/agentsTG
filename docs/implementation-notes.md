@@ -6,7 +6,35 @@
 
 ---
 
-## 2026-05-28 — Telegram Agents Max Upgrade (8 фаз, API budget = 0)
+## 2026-05-30 — Full audit + Gemini chain deploy prep
+
+- **Аудит:** 47 pytest passed; flake8; GitHub Actions `.github/workflows/test.yml`.
+- **LLM:** `llm_client` — dynamic `get_settings()` для chain/available (fix тестов + runtime).
+- **Orchestrator:** pure greeting → `build_egor_greeting_html()` без LLM.
+- **Models:** `settings.get_agent_model()` → `get_model_for_provider(primary chain)`.
+- **Docs:** `deploy/FIRSTBYTE_VPS.md` (91.186.221.32), Gemini key guide в TIMWEB guide.
+- **Тесты:** +12 (llm chain fallback, agent_runner tiers, orchestrator greeting, PA FAQ).
+- **Verify:** `pytest tests/ -v` — **47 passed**; coverage llm_client 48%, prompt_builder 60%.
+- **Deploy:** push → user manual `git pull`, `GEMINI_API_KEY`, `systemctl restart agents-tg`.
+
+---
+
+## 2026-05-29 — Agents Soul LLM Upgrade (tiered prompts, Gemini chain, compact souls)
+
+- **Проблема на VPS:** Groq 429 (TPM 6000, prompt ~4800 tok) на «что ты можешь»; orchestrator возвращал HTML вместо JSON.
+- **Фаза 1 — Tiered prompts:** `prompt_builder.py` — `PromptTier` LIGHT/STANDARD/FULL; trim soul/env/history; LIGHT без tools (~−1500 tok). Интеграция в `agent_runner.py`.
+- **FAQ без LLM:** `capability_templates.py` + `personal_assistant.py` — шаблонный HTML на «что ты можешь» (0 API-вызовов).
+- **429 UX:** `llm_client.py` — parse `try again in Xs`, до 6 retry, `RateLimitError`; `agent_bot.py` — дружелюбное сообщение.
+- **Multi-provider:** `llm_client.py` — цепочка `gemini → groq → hf`; `settings.py` — `GEMINI_*`, `LLM_PROVIDER_CHAIN`; `agent_models.py` — `PROVIDER_MODELS`, orchestrator **8B** (не 70B); `qwen_client.py` — re-export alias.
+- **Orchestrator JSON:** `ORCHESTRATOR_JSON_DIRECTIVE` + HTML fallback через `supervisor_parse.py`; retry без `json_object` если parse failed.
+- **Souls:** переписаны из `AGENT_PERSONALITIES` (~30 строк, Telegram HTML): `personal_assistant.md`, `orchestrator.md`, 5 specialists.
+- **MANUS_PA_STYLE:** расширен intent→action matrix в `agent_prompts.py`.
+- **Deploy docs:** `.env.example`, `deploy/TIMWEB_VPS_GUIDE.md` (Gemini AI Studio), `deploy/OLLAMA_VPS.md` (после апгрейда RAM).
+- **Verify:** `python -m pytest tests/ -v` — **35 passed**.
+- **VPS deploy (ручной шаг):** `git pull`, добавить `GEMINI_API_KEY` + `LLM_PROVIDER_CHAIN=gemini,groq` в `/opt/agentsTG/.env`, `systemctl restart agents-tg`.
+
+---
+
 
 - **Фаза 1 — Environment «глаза»:** `environment_context.py` (`AgentEnvironment`, `build_environment`); `agent_bot` собирает контекст (chat type, peers, vault, tools, group/dm history) и передаёт в `process()` / `AgentRunner`.
 - **Фаза 2 — История:** `chat_history.py` (in-memory + Redis + Postgres hook); подключено в `AgentRunner` (system prompt + append после ответа).

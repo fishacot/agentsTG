@@ -178,15 +178,25 @@ class AgentBot:
                     )
 
             except Exception as e:
+                from src.agents_tg.services.llm_client import QwenAPIError, RateLimitError
+
                 logger.error(
                     "Error processing message in %s: %s",
                     self.agent_key,
                     e,
                     exc_info=True,
                 )
-                await thinking_msg.edit_text(
-                    "😕 Произошла ошибка. Попробуйте позже."
-                )
+                if isinstance(e, (RateLimitError, QwenAPIError)) and (
+                    getattr(e, "status", 0) == 429 or getattr(e, "retryable", False)
+                ):
+                    await thinking_msg.edit_text(
+                        "⏳ Сейчас перегрузка AI (лимит запросов). "
+                        "Подождите 10–15 секунд и повторите."
+                    )
+                else:
+                    await thinking_msg.edit_text(
+                        "😕 Произошла ошибка. Попробуйте позже."
+                    )
 
             finally:
                 await state.set_state(AgentStates.idle)

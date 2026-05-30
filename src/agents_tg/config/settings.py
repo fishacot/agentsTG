@@ -41,10 +41,17 @@ class AppSettings(BaseSettings):
     # Private channel for Elza notes (bot must be channel admin)
     NOTES_CHANNEL_ID: int = 0
 
-    # AI Settings — Groq (primary, free tier) or legacy Hugging Face fallback
+    # AI — multi-provider (see LLM_PROVIDER_CHAIN)
     GROQ_API_KEY: str = ""
     GROQ_API_BASE: str = "https://api.groq.com/openai/v1/chat/completions"
     GROQ_MODEL: str = "llama-3.1-8b-instant"
+
+    GEMINI_API_KEY: str = ""
+    GEMINI_API_BASE: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+
+    # Comma-separated fallback order, e.g. gemini,groq,huggingface
+    LLM_PROVIDER_CHAIN: str = "gemini,groq"
 
     QWEN_API_KEY: str = ""
     QWEN_API_BASE: str = "https://router.huggingface.co/v1/chat/completions"
@@ -90,28 +97,35 @@ class AppSettings(BaseSettings):
         return normalize_database_url(self.DATABASE_URL)
 
     @property
+    def llm_provider_chain_list(self) -> list[str]:
+        raw = (self.LLM_PROVIDER_CHAIN or "").strip()
+        if not raw:
+            return []
+        return [p.strip().lower() for p in raw.split(",") if p.strip()]
+
+    @property
     def llm_api_key(self) -> str:
-        """Active LLM API key (Groq preferred)."""
-        return self.GROQ_API_KEY or self.QWEN_API_KEY
+        """Legacy: first available API key."""
+        return self.GEMINI_API_KEY or self.GROQ_API_KEY or self.QWEN_API_KEY
 
     @property
     def llm_api_base(self) -> str:
-        """Active LLM chat completions endpoint."""
+        if self.GEMINI_API_KEY:
+            return f"{self.GEMINI_API_BASE.rstrip('/')}/chat/completions"
         if self.GROQ_API_KEY:
             return self.GROQ_API_BASE
         return self.QWEN_API_BASE
 
     @property
     def llm_default_model(self) -> str:
-        """Default model when none specified."""
+        if self.GEMINI_API_KEY:
+            return self.GEMINI_MODEL
         if self.GROQ_API_KEY:
             return self.GROQ_MODEL
         return self.QWEN_MODEL
 
-    def get_agent_model(self, agent_key: str) -> str:
-        """Resolve model id for an agent (env override → code default)."""
-        from src.agents_tg.services.agent_models import AGENT_MODELS, MODEL_DEFAULT
-
+    def get_agent_model_override(self, agent_key: str) -> str:
+        """Env MODEL_* override only (empty if not set)."""
         env_map = {
             "orchestrator": self.MODEL_ORCHESTRATOR,
             "personal_assistant": self.MODEL_PERSONAL_ASSISTANT,
@@ -122,10 +136,19 @@ class AppSettings(BaseSettings):
             "marketing": self.MODEL_MARKETING,
             "general": self.MODEL_DEFAULT,
         }
-        override = env_map.get(agent_key, "")
+        return (env_map.get(agent_key) or "").strip()
+
+    def get_agent_model(self, agent_key: str, provider: str | None = None) -> str:
+        """Resolve model id (env override → provider matrix)."""
+        from src.agents_tg.services.agent_models import get_model_for_provider
+
+        override = self.get_agent_model_override(agent_key)
         if override:
             return override
-        return AGENT_MODELS.get(agent_key, MODEL_DEFAULT)
+        prov = provider or (
+            self.llm_provider_chain_list[0] if self.llm_provider_chain_list else "groq"
+        )
+        return get_model_for_provider(agent_key, prov)
 
 
 def get_settings() -> AppSettings:

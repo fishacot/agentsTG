@@ -243,19 +243,13 @@ agentsTG/
 
 ```bash
 # Запуск всех тестов
-pytest
+pytest tests/ -v
 
 # С покрытием
-pytest --cov=src --cov-report=html
+pytest tests/ -v --cov=src --cov-report=html
 
-# Только unit тесты
-pytest tests/unit/
-
-# Только integration тесты
-pytest tests/integration/
-
-# Конкретный тест
-pytest tests/unit/test_coordinator.py -v
+# Конкретный файл
+pytest tests/test_llm_client.py -v
 ```
 
 ---
@@ -307,7 +301,19 @@ bandit -r src/
 
 ## 🚢 Деплой
 
-### Railway.app
+### VPS FirstByte (production)
+
+См. [`deploy/FIRSTBYTE_VPS.md`](deploy/FIRSTBYTE_VPS.md) — IP `91.186.221.32`, `/opt/agentsTG`.
+
+Обязательно в `.env`:
+
+```env
+GEMINI_API_KEY=...          # https://aistudio.google.com/apikey (free)
+LLM_PROVIDER_CHAIN=gemini,groq
+GROQ_API_KEY=...            # fallback
+```
+
+### Railway.app / Render
 
 1. Создать аккаунт на [Railway.app](https://railway.app/)
 2. Подключить GitHub репозиторий

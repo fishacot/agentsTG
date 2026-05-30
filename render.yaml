@@ -40,3 +40,11 @@ services:
         value: https://api.groq.com/openai/v1/chat/completions
       - key: GROQ_MODEL
         value: llama-3.1-8b-instant
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_API_BASE
+        value: https://generativelanguage.googleapis.com/v1beta/openai
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: LLM_PROVIDER_CHAIN
+        value: gemini,groq
