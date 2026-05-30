@@ -181,10 +181,31 @@ def build_system_prompt(
 
 
 def tools_for_tier(tool_list: list, tier: PromptTier) -> list:
-    """LIGHT tier: no tools sent to LLM (saves ~1500 tokens)."""
+    """LIGHT: no tools; STANDARD: memory/tasks only; FULL: all tools."""
     if tier == PromptTier.LIGHT:
         return []
+    if tier == PromptTier.STANDARD:
+        allowed = frozenset({"remember_about_user", "list_tasks"})
+        return [t for t in tool_list if t.name in allowed]
     return tool_list
+
+
+_MEMORY_META = re.compile(
+    r"(?i)"
+    r"(?:ты\s+)?(?:можешь|умеешь)\s+запоминать"
+    r"|(?:ты\s+)?(?:можешь|умеешь)\s+запомнить"
+    r"|ты\s+помнишь(?:\s+меня)?"
+    r"|помнишь\s+меня"
+    r"|есть\s+ли\s+у\s+тебя\s+память"
+)
+
+
+def is_memory_meta_question(message: str) -> bool:
+    """«Можешь запоминать?» — FAQ без LLM и без вызова remember tool."""
+    text = (message or "").strip()
+    if not text or _ACTION_PATTERN.search(text):
+        return False
+    return bool(_MEMORY_META.search(text))
 
 
 def is_pure_greeting(message: str) -> bool:

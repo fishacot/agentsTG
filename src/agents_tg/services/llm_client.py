@@ -358,8 +358,9 @@ class LLMClient:
 
         errors: list[str] = []
         async with _LLM_SEMAPHORE:
-            for provider in chain:
+            for idx, provider in enumerate(chain):
                 resolved = model or self.model_for_agent(agent_key or "", provider.name)
+                has_next = idx < len(chain) - 1
                 try:
                     return await provider.chat_completion(
                         messages,
@@ -371,12 +372,17 @@ class LLMClient:
                         response_format=response_format,
                     )
                 except RateLimitError as exc:
-                    errors.append(f"{provider.name}:429")
+                    errors.append(f"{provider.name}:{exc.status or 429}")
                     logger.warning("Provider %s rate limited, trying next", provider.name)
                     continue
                 except QwenAPIError as exc:
-                    if exc.retryable:
-                        errors.append(f"{provider.name}:{exc.status}")
+                    errors.append(f"{provider.name}:{exc.status}")
+                    if has_next or exc.retryable:
+                        logger.warning(
+                            "Provider %s failed (status=%s), trying next",
+                            provider.name,
+                            exc.status,
+                        )
                         continue
                     raise
 

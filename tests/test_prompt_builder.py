@@ -24,6 +24,14 @@ def test_capabilities_question():
     assert not is_capabilities_question("запиши заметку")
 
 
+def test_memory_meta_question():
+    from src.agents_tg.services.prompt_builder import is_memory_meta_question
+
+    assert is_memory_meta_question("ты можешь запоминать?")
+    assert is_memory_meta_question("ты помнишь меня")
+    assert not is_memory_meta_question("запомни что я люблю кофе")
+
+
 async def _dummy(**kwargs):
     return tool_result(ok=True)
 

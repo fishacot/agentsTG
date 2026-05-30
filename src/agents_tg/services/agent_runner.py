@@ -12,7 +12,7 @@ from src.agents_tg.services.agent_prompts import FINALIZE_USER_REPLY
 from src.agents_tg.services.agent_identity import get_agent_identity
 from src.agents_tg.services.chat_history import chat_history
 from src.agents_tg.services.environment_context import AgentEnvironment
-from src.agents_tg.services.llm_client import llm_client
+from src.agents_tg.services.llm_client import RateLimitError, llm_client
 from src.agents_tg.services.memory_service import memory_service
 from src.agents_tg.services.prompt_builder import (
     PromptTier,
@@ -52,6 +52,18 @@ def _openai_tool(tool: AgentTool) -> dict[str, Any]:
             "parameters": tool.parameters,
         },
     }
+
+
+def parse_tool_arguments(raw_args: str | None, user_id: str) -> dict[str, Any]:
+    """Parse Groq/OpenAI tool arguments; Groq may return JSON null."""
+    payload = raw_args or "{}"
+    try:
+        parsed = json.loads(payload)
+        args = parsed if isinstance(parsed, dict) else {}
+    except json.JSONDecodeError:
+        args = {}
+    args.setdefault("user_id", user_id)
+    return args
 
 
 def _remember_tool(agent_key: str) -> AgentTool:
@@ -123,7 +135,11 @@ def deep_research_tool() -> AgentTool:
 class AgentRunner:
     """Run an agent: understand the goal, use tools only when needed."""
 
-    MAX_TOOL_ROUNDS = 3
+    MAX_TOOL_ROUNDS = 2
+    _RATE_LIMIT_REPLY = (
+        "⏳ Сейчас перегрузка AI (лимит Groq). "
+        "Подождите 15–30 секунд и повторите."
+    )
 
     async def run(
         self,
@@ -147,6 +163,8 @@ class AgentRunner:
         tier = detect_prompt_tier(user_message, include_web_tools=include_web_tools)
         if tier == PromptTier.LIGHT:
             max_tokens = min(max_tokens, 512)
+        elif tier == PromptTier.STANDARD:
+            max_tokens = min(max_tokens, 768)
 
         tool_list = list(tools or [])
         tool_list.append(_remember_tool(agent_key))
@@ -196,71 +214,74 @@ class AgentRunner:
         handlers = {t.name: t.handler for t in tool_list}
         tools_used = False
 
-        for _ in range(self.MAX_TOOL_ROUNDS):
-            result = await llm_client.chat_completion(
-                messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                agent_key=agent_key,
-                tools=openai_tools if openai_tools else None,
-            )
-            tool_calls = result.get("tool_calls") or []
-            content = (result.get("content") or "").strip()
-
-            if not tool_calls:
-                if content:
-                    await chat_history.append(user_id, agent_key, "user", user_message)
-                    await chat_history.append(user_id, agent_key, "assistant", content)
-                    return content
-                if tools_used:
-                    break
-                return (
-                    "Не смог ответить — попробуй переформулировать "
-                    "или задай вопрос проще."
-                )
-
-            tools_used = True
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": content or None,
-                    "tool_calls": tool_calls,
-                }
-            )
-
-            for call in tool_calls:
-                fn = call.get("function") or {}
-                name = fn.get("name", "")
-                raw_args = fn.get("arguments") or "{}"
+        try:
+            for _ in range(self.MAX_TOOL_ROUNDS):
                 try:
-                    args = json.loads(raw_args)
-                except json.JSONDecodeError:
-                    args = {}
-                args.setdefault("user_id", user_id)
-                handler = handlers.get(name)
-                if not handler:
-                    tool_output = tool_result(ok=False, error=f"unknown_tool:{name}")
-                else:
-                    try:
-                        tool_output = await handler(**args)
-                    except Exception as exc:
-                        logger.exception("Tool %s failed", name)
-                        tool_output = tool_result(ok=False, error=str(exc))
+                    result = await llm_client.chat_completion(
+                        messages,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        agent_key=agent_key,
+                        tools=openai_tools if openai_tools else None,
+                    )
+                except RateLimitError:
+                    return self._RATE_LIMIT_REPLY
 
+                tool_calls = result.get("tool_calls") or []
+                content = (result.get("content") or "").strip()
+
+                if not tool_calls:
+                    if content:
+                        await chat_history.append(user_id, agent_key, "user", user_message)
+                        await chat_history.append(user_id, agent_key, "assistant", content)
+                        return content
+                    if tools_used:
+                        break
+                    return (
+                        "Не смог ответить — попробуй переформулировать "
+                        "или задай вопрос проще."
+                    )
+
+                tools_used = True
                 messages.append(
                     {
-                        "role": "tool",
-                        "tool_call_id": call.get("id", name),
-                        "content": tool_output,
+                        "role": "assistant",
+                        "content": content or None,
+                        "tool_calls": tool_calls,
                     }
                 )
 
-        final = await self._finalize_user_message(
-            messages,
-            agent_key=agent_key,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
+                for call in tool_calls:
+                    fn = call.get("function") or {}
+                    name = fn.get("name", "")
+                    args = parse_tool_arguments(fn.get("arguments"), user_id)
+                    handler = handlers.get(name)
+                    if not handler:
+                        tool_output = tool_result(ok=False, error=f"unknown_tool:{name}")
+                    else:
+                        try:
+                            tool_output = await handler(**args)
+                        except Exception as exc:
+                            logger.exception("Tool %s failed", name)
+                            tool_output = tool_result(ok=False, error=str(exc))
+
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": call.get("id", name),
+                            "content": tool_output,
+                        }
+                    )
+
+            final = await self._finalize_user_message(
+                messages,
+                agent_key=agent_key,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+        except RateLimitError:
+            return self._RATE_LIMIT_REPLY
+
         await chat_history.append(user_id, agent_key, "user", user_message)
         await chat_history.append(user_id, agent_key, "assistant", final)
         return final
@@ -276,13 +297,19 @@ class AgentRunner:
         """Force a natural-language reply after tool observations."""
         finalize_messages = list(messages)
         finalize_messages.append({"role": "system", "content": FINALIZE_USER_REPLY})
-        result = await llm_client.chat_completion(
-            finalize_messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            agent_key=agent_key,
-            tools=None,
-        )
+        try:
+            result = await llm_client.chat_completion(
+                finalize_messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                agent_key=agent_key,
+                tools=None,
+            )
+        except RateLimitError:
+            for msg in reversed(messages):
+                if msg.get("role") == "assistant" and (msg.get("content") or "").strip():
+                    return str(msg["content"]).strip()
+            raise
         text = (result.get("content") or "").strip()
         if text:
             return text
@@ -301,5 +328,6 @@ __all__ = [
     "AgentTool",
     "agent_runner",
     "deep_research_tool",
+    "parse_tool_arguments",
     "tool_result",
 ]

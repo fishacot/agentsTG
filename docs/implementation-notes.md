@@ -6,16 +6,55 @@
 
 ---
 
+## 2026-05-30 — Elza Groq 429 patch (commit + VPS deploy)
+
+- **Лог:** 1-й запрос OK (FAQ); 2-й — Gemini 400 → Groq 200 → crash `args=null`; далее Groq TPM 429 на тяжёлых промптах.
+- **Fix:** `LLM_PROVIDER_CHAIN=groq` на VPS; `parse_tool_arguments` (null JSON); STANDARD tier — только remember/list_tasks; max_tokens 768; FAQ «можешь запomинать»; RateLimitError → дружелюбный текст; MAX_TOOL_ROUNDS=2.
+- **Verify:** pytest **52 passed**.
+- **Deploy:** commit → push → git pull VPS → `.env` groq → restart.
+
+---
+
+## 2026-05-30 — Elza: Groq tool args `null` crash
+
+- **Лог 01:07:09:** Gemini 400 → fallback OK → Groq **200** → `AttributeError: 'NoneType' object has no attribute 'setdefault'` в `agent_runner.py:239`.
+- **Причина:** Groq вернул `arguments: "null"` → `json.loads` → `None`, не `{}`.
+- **Fix:** после parse проверка `isinstance(parsed, dict)`.
+- **Deploy:** патч на VPS + restart.
+
+---
+
+## 2026-05-30 — Elza: Gemini geo-block на VPS, fallback fix
+
+- **Симптом:** `personal_assistant` → `API error (gemini-2.5-flash): 400` — `"User location is not supported for the API use."` (FirstByte VPS).
+- **Причина:** Gemini недоступен с IP VPS; при 400 fallback на Groq **не срабатывал** (только 429).
+- **Fix:** `llm_client.chat_completion` — при ошибке провайдера пробует следующий в chain, если он есть.
+- **Тест:** `test_chat_completion_fallback_on_provider_error`.
+- **Deploy:** патч `llm_client.py` на VPS + restart `agents-tg`.
+- **Примечание:** Gemini с VPS не заработает без прокси; chain `gemini,groq` теперь уходит на Groq автоматически.
+
+---
+
+## 2026-05-30 — VPS deploy завершён (FirstByte 91.186.221.32)
+
+- **VPS:** `git reset --hard origin/master` → `c6dcef4`; `.env` с `GEMINI_API_KEY` + `LLM_PROVIDER_CHAIN=gemini,groq` (не перезаписан git).
+- **Service:** `systemctl restart agents-tg` → **active**.
+- **Локально:** `.env` обновлён с Gemini key (gitignored).
+- **Приёмка (Telegram, ручная):** Эльза «расскажи что ты можешь» → instant HTML; Егор «привет» → только Егор; нет 429.
+- **Безопасность:** пароль VPS и Gemini key были в чате — рекомендована ротация.
+
+---
+
 ## 2026-05-30 — Full audit + Gemini chain deploy prep
 
-- **Аудит:** 47 pytest passed; flake8; GitHub Actions `.github/workflows/test.yml`.
+- **Аудит:** 48 pytest passed; flake8; GitHub Actions `.github/workflows/test.yml`.
 - **LLM:** `llm_client` — dynamic `get_settings()` для chain/available (fix тестов + runtime).
 - **Orchestrator:** pure greeting → `build_egor_greeting_html()` без LLM.
 - **Models:** `settings.get_agent_model()` → `get_model_for_provider(primary chain)`.
 - **Docs:** `deploy/FIRSTBYTE_VPS.md` (91.186.221.32), Gemini key guide в TIMWEB guide.
 - **Тесты:** +12 (llm chain fallback, agent_runner tiers, orchestrator greeting, PA FAQ).
-- **Verify:** `pytest tests/ -v` — **47 passed**; coverage llm_client 48%, prompt_builder 60%.
-- **Deploy:** push → user manual `git pull`, `GEMINI_API_KEY`, `systemctl restart agents-tg`.
+- **Verify:** `pytest tests/ -v` — **48 passed**; coverage llm_client 48%, prompt_builder 60%.
+- **Commit/push:** `c6dcef4` на `origin/master`.
 
 ---
 

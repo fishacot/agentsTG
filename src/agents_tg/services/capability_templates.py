@@ -43,6 +43,19 @@ def build_elza_capabilities_html(environment: AgentEnvironment | None = None) ->
     )
 
 
+def build_elza_memory_faq_html() -> str:
+    """Answer «можешь запоминать?» without LLM."""
+    return (
+        "<b>Да, могу запоминать.</b>\n\n"
+        "Если вы расскажете о себе факт — я сохраню его и учту в следующих "
+        "разговорах. Например: «Запомни, что я программист» или "
+        "«Я живу в Москве».\n\n"
+        "На вопрос «ты помнишь?» без нового факта — просто отвечаю, "
+        "не создаю заметку.\n\n"
+        "<i>Расскажите что-нибудь о себе — запомню.</i>"
+    )
+
+
 def build_egor_greeting_html() -> str:
     """Static greeting for Егор orchestrator (no LLM call)."""
     colleagues = []

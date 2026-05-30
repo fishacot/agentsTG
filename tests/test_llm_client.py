@@ -85,6 +85,37 @@ async def test_chat_completion_fallback_on_rate_limit(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_chat_completion_fallback_on_provider_error(monkeypatch):
+    """Geo-block / bad key on Gemini should fall through to Groq."""
+    monkeypatch.setenv("GEMINI_API_KEY", "g1")
+    monkeypatch.setenv("GROQ_API_KEY", "g2")
+    monkeypatch.setenv("LLM_PROVIDER_CHAIN", "gemini,groq")
+
+    from src.agents_tg.config.settings import AppSettings
+
+    AppSettings()
+    client = LLMClient()
+
+    gemini = client._providers["gemini"]
+    groq = client._providers["groq"]
+
+    async def gemini_geo_block(*args, **kwargs):
+        raise QwenAPIError("API error (gemini): 400", status=400, retryable=False)
+
+    async def groq_ok(*args, **kwargs):
+        return {"content": "ok from groq", "tool_calls": []}
+
+    gemini.chat_completion = gemini_geo_block
+    groq.chat_completion = groq_ok
+
+    result = await client.chat_completion(
+        [{"role": "user", "content": "hi"}],
+        agent_key="personal_assistant",
+    )
+    assert result["content"] == "ok from groq"
+
+
+@pytest.mark.asyncio
 async def test_all_providers_fail_raises_rate_limit(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "g1")
     monkeypatch.setenv("GROQ_API_KEY", "g2")
