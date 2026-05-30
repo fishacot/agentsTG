@@ -10,15 +10,6 @@ from typing import Any, Dict, List, Optional
 from src.agents_tg.config.settings import get_settings
 from src.agents_tg.services.agent_prompts import MANUS_PA_STYLE
 from src.agents_tg.services.agent_runner import AgentTool, agent_runner, tool_result
-from src.agents_tg.services.capability_templates import (
-    build_elza_capabilities_html,
-    build_elza_memory_faq_html,
-)
-from src.agents_tg.services.chat_history import chat_history
-from src.agents_tg.services.prompt_builder import (
-    is_capabilities_question,
-    is_memory_meta_question,
-)
 from src.agents_tg.utils.git_sync import obsidian_sync
 
 logger = logging.getLogger(__name__)
@@ -211,7 +202,11 @@ class PersonalAssistant:
             ),
             AgentTool(
                 name="list_tasks",
-                description="Показать задачи — когда пользователь просит список дел.",
+                description=(
+                    "Показать список задач пользователя — ТОЛЬКО когда он явно просит "
+                    "«покажи дела», «мои задачи», «список дел». "
+                    "НЕ вызывай на новости, сводки, вопросы о себе или общий разговор."
+                ),
                 parameters={"type": "object", "properties": {}},
                 handler=list_tasks_handler,
             ),
@@ -245,18 +240,6 @@ class PersonalAssistant:
         from src.agents_tg.services.environment_context import AgentEnvironment
 
         env = environment if isinstance(environment, AgentEnvironment) else None
-
-        if is_capabilities_question(message):
-            reply = build_elza_capabilities_html(env)
-            await chat_history.append(user_id, "personal_assistant", "user", message)
-            await chat_history.append(user_id, "personal_assistant", "assistant", reply)
-            return reply
-
-        if is_memory_meta_question(message):
-            reply = build_elza_memory_faq_html()
-            await chat_history.append(user_id, "personal_assistant", "user", message)
-            await chat_history.append(user_id, "personal_assistant", "assistant", reply)
-            return reply
 
         return await agent_runner.run(
             agent_key="personal_assistant",

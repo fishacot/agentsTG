@@ -35,26 +35,20 @@ async def test_invalid_note_title_rejected(pa: PersonalAssistant) -> None:
 
 
 @pytest.mark.asyncio
-async def test_capabilities_faq_no_llm(pa: PersonalAssistant, monkeypatch) -> None:
+async def test_meta_questions_use_llm(pa: PersonalAssistant) -> None:
     from unittest.mock import AsyncMock, patch
 
     with patch(
         "src.agents_tg.agents.personal_assistant.agent_runner.run",
         new_callable=AsyncMock,
+        return_value="Живой ответ от LLM",
     ) as mock_run:
-        reply = await pa.process("расскажи что ты можешь", user_id="u1")
-        mock_run.assert_not_called()
-        assert "<b>Я Эльза</b>" in reply
-
-
-@pytest.mark.asyncio
-async def test_memory_faq_no_llm(pa: PersonalAssistant, monkeypatch) -> None:
-    from unittest.mock import AsyncMock, patch
-
-    with patch(
-        "src.agents_tg.agents.personal_assistant.agent_runner.run",
-        new_callable=AsyncMock,
-    ) as mock_run:
-        reply = await pa.process("ты можешь запоминать?", user_id="u1")
-        mock_run.assert_not_called()
-        assert "могу запоминать" in reply.lower()
+        for msg in (
+            "расскажи что ты можешь",
+            "ты можешь запоминать?",
+            "кто ты",
+            "отправь сводку новостей об ии",
+        ):
+            reply = await pa.process(msg, user_id="u1")
+            assert reply == "Живой ответ от LLM"
+        assert mock_run.call_count == 4

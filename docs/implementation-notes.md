@@ -6,12 +6,28 @@
 
 ---
 
-## 2026-05-30 — Elza Groq 429 patch (commit + VPS deploy)
+## 2026-05-30 — LLM-first: убраны статические FAQ-ответы
+
+- **Проблема:** Эльза отвечала шаблоном на «кто ты» / «что можешь» (`capability_templates.py` fast-path) и вызывала `list_tasks` на «сводку новостей» → «нет в списке дел».
+- **Решение (философия: агент думает сам, оболочка направляет поток):**
+  - Удалены `capability_templates.py` и все FAQ fast-path в `personal_assistant.py` и `orchestrator.py`.
+  - «Кто ты», возможности, память, новости/сводки → **LIGHT tier, 0 tools**, ответ только через LLM + soul.
+  - STANDARD tier: только `remember_about_user`; `list_tasks` — если явно «покажи дела».
+  - Усилены промпты в `agent_prompts.py`, soul Эльзы (handoff на @ulyana_research_bot для новостей).
+- **Файлы:** `prompt_builder.py`, `personal_assistant.py`, `orchestrator.py`, `agent_prompts.py`, `personal_assistant.md`; удалён `capability_templates.py`.
+- **Verify:** pytest **48 passed**.
+- **Deploy:** не выполнен — нужен commit + push + VPS pull после подтверждения.
+
+---
+
+## 2026-05-30 — Elza Groq 429 patch (commit + VPS deploy) ✅
 
 - **Лог:** 1-й запрос OK (FAQ); 2-й — Gemini 400 → Groq 200 → crash `args=null`; далее Groq TPM 429 на тяжёлых промптах.
-- **Fix:** `LLM_PROVIDER_CHAIN=groq` на VPS; `parse_tool_arguments` (null JSON); STANDARD tier — только remember/list_tasks; max_tokens 768; FAQ «можешь запomинать»; RateLimitError → дружелюбный текст; MAX_TOOL_ROUNDS=2.
+- **Fix:** `LLM_PROVIDER_CHAIN=groq` на VPS; `parse_tool_arguments` (null JSON); STANDARD tier — только remember/list_tasks; max_tokens 768; FAQ «можешь запоминать»; RateLimitError → дружелюбный текст; MAX_TOOL_ROUNDS=2.
 - **Verify:** pytest **52 passed**.
-- **Deploy:** commit → push → git pull VPS → `.env` groq → restart.
+- **Git:** commit `eea882c` → pushed `origin/master`.
+- **VPS (91.186.221.32):** `git reset --hard origin/master` → `eea882c`; `.env` `LLM_PROVIDER_CHAIN=groq`; `systemctl restart agents-tg` → **active**; все 7 ботов в polling.
+- **Приёмка (Telegram, ручная):** «расскажи что ты можешь» → instant HTML; обычное 2-е сообщение → ответ без «😕 ошибка»; при 429 → «подождите 15–30 сек».
 
 ---
 

@@ -3,7 +3,6 @@
 from src.agents_tg.services.prompt_builder import (
     PromptTier,
     detect_prompt_tier,
-    is_capabilities_question,
     tools_for_tier,
 )
 from src.agents_tg.services.agent_runner import AgentTool, tool_result
@@ -12,24 +11,18 @@ from src.agents_tg.services.agent_runner import AgentTool, tool_result
 def test_detect_light_tier_greeting():
     assert detect_prompt_tier("привет") == PromptTier.LIGHT
     assert detect_prompt_tier("как дела?") == PromptTier.LIGHT
+    assert detect_prompt_tier("кто ты") == PromptTier.LIGHT
+
+
+def test_detect_light_tier_news_digest():
+    assert detect_prompt_tier("отправь сводку новостей об ии") == PromptTier.LIGHT
+    assert detect_prompt_tier("расскажи что ты можешь") == PromptTier.LIGHT
 
 
 def test_detect_full_tier_action():
     assert detect_prompt_tier("запиши заметку про встречу") == PromptTier.FULL
     assert detect_prompt_tier("найди лучший фреймворк") == PromptTier.FULL
-
-
-def test_capabilities_question():
-    assert is_capabilities_question("расскажи что ты можешь")
-    assert not is_capabilities_question("запиши заметку")
-
-
-def test_memory_meta_question():
-    from src.agents_tg.services.prompt_builder import is_memory_meta_question
-
-    assert is_memory_meta_question("ты можешь запоминать?")
-    assert is_memory_meta_question("ты помнишь меня")
-    assert not is_memory_meta_question("запомни что я люблю кофе")
+    assert detect_prompt_tier("покажи мои дела") == PromptTier.FULL
 
 
 async def _dummy(**kwargs):
@@ -39,5 +32,25 @@ async def _dummy(**kwargs):
 def test_light_tier_no_tools():
     tools = [
         AgentTool(name="x", description="d", parameters={}, handler=_dummy),
+        AgentTool(name="list_tasks", description="d", parameters={}, handler=_dummy),
     ]
-    assert tools_for_tier(tools, PromptTier.LIGHT) == []
+    assert tools_for_tier(tools, PromptTier.LIGHT, "привет") == []
+
+
+def test_standard_tier_remember_only_by_default():
+    tools = [
+        AgentTool(name="remember_about_user", description="d", parameters={}, handler=_dummy),
+        AgentTool(name="list_tasks", description="d", parameters={}, handler=_dummy),
+        AgentTool(name="add_task", description="d", parameters={}, handler=_dummy),
+    ]
+    active = tools_for_tier(tools, PromptTier.STANDARD, "сводка новостей об ии")
+    assert [t.name for t in active] == ["remember_about_user"]
+
+
+def test_standard_tier_list_tasks_when_asked():
+    tools = [
+        AgentTool(name="remember_about_user", description="d", parameters={}, handler=_dummy),
+        AgentTool(name="list_tasks", description="d", parameters={}, handler=_dummy),
+    ]
+    active = tools_for_tier(tools, PromptTier.STANDARD, "покажи мои дела")
+    assert {t.name for t in active} == {"remember_about_user", "list_tasks"}

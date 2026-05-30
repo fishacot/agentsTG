@@ -13,7 +13,7 @@ from src.agents_tg.services.agent_prompts import (
 )
 from src.agents_tg.services.environment_context import AgentEnvironment
 
-# Greetings, meta-questions — minimal prompt, no tools
+# Greetings and meta — minimal prompt, no tools (LLM still answers)
 _LIGHT_GREETING = re.compile(
     r"^(?:"
     r"привет|здравств|добрый|hi|hello|hey"
@@ -25,10 +25,21 @@ _LIGHT_GREETING = re.compile(
     re.IGNORECASE,
 )
 _LIGHT_CAPABILITIES = re.compile(
-    r"(?:расскажи|опиши|покажи).{0,30}(?:"
-    r"что ты можешь|чем можешь|твои возможности|умеешь"
+    r"(?:расскажи|опиши|покажи|скажи).{0,40}(?:"
+    r"что ты можешь|чем можешь|чем ты можешь|твои возможности|что умеешь|чем помочь"
     r")",
     re.IGNORECASE,
+)
+# News, digests, general knowledge — conversation only, no tools (avoid wrong list_tasks)
+_CONVERSATION_INFO = re.compile(
+    r"(?i)"
+    r"(?:новост|сводк|digest|что\s+нового|актуальн|сегодня\s+в|"
+    r"расскажи\s+про|объясни|что\s+такое|как\s+работает)"
+)
+
+_TASK_LIST_PATTERN = re.compile(
+    r"(?i)(список\s+дел|мои\s+задачи|покажи\s+(?:мои\s+)?дела|"
+    r"что\s+в\s+задачах|list\s+tasks|мои\s+дела)"
 )
 
 # Explicit actions — full tools + soul
@@ -36,7 +47,7 @@ _ACTION_PATTERN = re.compile(
     r"(?i)("
     r"создай|создать|запиши|записать|сохрани|сохранить"
     r"|найди|найти|поиск|исследуй|research"
-    r"|добавь задач|список дел|list tasks"
+    r"|добавь задач|список дел|list tasks|покажи\s+(?:мои\s+)?дела"
     r"|запомни что|remember"
     r"|deep_research|заметк"
     r")"
@@ -55,7 +66,11 @@ def detect_prompt_tier(user_message: str, *, include_web_tools: bool = False) ->
         return PromptTier.LIGHT
     if _ACTION_PATTERN.search(text):
         return PromptTier.FULL
-    if _LIGHT_GREETING.search(text) or _LIGHT_CAPABILITIES.search(text):
+    if (
+        _LIGHT_GREETING.search(text)
+        or _LIGHT_CAPABILITIES.search(text)
+        or _CONVERSATION_INFO.search(text)
+    ):
         return PromptTier.LIGHT
     if include_web_tools and len(text) > 120:
         return PromptTier.FULL
@@ -115,9 +130,11 @@ def trim_soul(soul: str, tier: PromptTier) -> str:
 
 def light_goal_directive() -> str:
     return (
-        "Отвечай живым языком от первого лица. "
-        "На приветствия и вопросы о себе — без инструментов. "
-        "Инструменты только при явной просьбе что-то сделать."
+        "Отвечай живым языком от первого лица — каждый раз по-новому, "
+        "с учётом контекста и soul. "
+        "На приветствия, «кто ты», возможности, память, новости — только разговор, "
+        "без инструментов. "
+        "Инструменты — только при явной просьбе что-то сделать (записать, задача, список дел)."
     )
 
 
@@ -180,47 +197,17 @@ def build_system_prompt(
     )
 
 
-def tools_for_tier(tool_list: list, tier: PromptTier) -> list:
-    """LIGHT: no tools; STANDARD: memory/tasks only; FULL: all tools."""
+def tools_for_tier(
+    tool_list: list,
+    tier: PromptTier,
+    user_message: str = "",
+) -> list:
+    """LIGHT: no tools; STANDARD: remember only (+ list_tasks if explicitly asked); FULL: all."""
     if tier == PromptTier.LIGHT:
         return []
     if tier == PromptTier.STANDARD:
-        allowed = frozenset({"remember_about_user", "list_tasks"})
+        allowed = {"remember_about_user"}
+        if _TASK_LIST_PATTERN.search(user_message or ""):
+            allowed.add("list_tasks")
         return [t for t in tool_list if t.name in allowed]
     return tool_list
-
-
-_MEMORY_META = re.compile(
-    r"(?i)"
-    r"(?:ты\s+)?(?:можешь|умеешь)\s+запоминать"
-    r"|(?:ты\s+)?(?:можешь|умеешь)\s+запомнить"
-    r"|ты\s+помнишь(?:\s+меня)?"
-    r"|помнишь\s+меня"
-    r"|есть\s+ли\s+у\s+тебя\s+память"
-)
-
-
-def is_memory_meta_question(message: str) -> bool:
-    """«Можешь запоминать?» — FAQ без LLM и без вызова remember tool."""
-    text = (message or "").strip()
-    if not text or _ACTION_PATTERN.search(text):
-        return False
-    return bool(_MEMORY_META.search(text))
-
-
-def is_pure_greeting(message: str) -> bool:
-    """Pure hello/thanks — no LLM needed for orchestrator."""
-    text = (message or "").strip()
-    return bool(text and _LIGHT_GREETING.match(text))
-
-
-def is_capabilities_question(message: str) -> bool:
-    text = (message or "").strip().lower()
-    return bool(
-        re.search(
-            r"(расскажи|опиши|покажи|что ты можешь|чем можешь|чем ты можешь|"
-            r"твои возможности|что умеешь|чем помочь)",
-            text,
-        )
-        and not _ACTION_PATTERN.search(text)
-    )

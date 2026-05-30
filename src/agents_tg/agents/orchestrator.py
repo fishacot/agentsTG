@@ -22,10 +22,8 @@ from src.agents_tg.services.agent_prompts import (
 )
 from src.agents_tg.services.llm_client import llm_client
 from src.agents_tg.services.memory_service import memory_service
-from src.agents_tg.services.capability_templates import build_egor_greeting_html
 from src.agents_tg.services.prompt_builder import (
     PromptTier,
-    is_pure_greeting,
     trim_env_block,
 )
 from src.agents_tg.services.supervisor_parse import parse_supervisor_response
@@ -305,9 +303,6 @@ class Orchestrator:
             env_block = environment.to_prompt_block()
         else:
             env_block = environment_block
-
-        if is_pure_greeting(message):
-            return build_egor_greeting_html()
 
         initial_state = {
             "messages": [HumanMessage(content=message)],

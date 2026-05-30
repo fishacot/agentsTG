@@ -205,7 +205,7 @@ class AgentRunner:
             user_id=user_id,
         )
 
-        active_tools = tools_for_tier(tool_list, tier)
+        active_tools = tools_for_tier(tool_list, tier, user_message)
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": system},
             {"role": "user", "content": user_message},
