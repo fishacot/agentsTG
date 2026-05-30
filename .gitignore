@@ -9,16 +9,19 @@ build/
 .eggs/
 *.egg
 
-# Environment
-.env
+# Local workspace mirror (OpenClaw USER/MEMORY)
+workspace/
 .venv/
 venv/
 env/
 *.venv
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
+node_modules/
 *.swp
 *.swo
 
@@ -27,6 +30,8 @@ env/
 Thumbs.db
 
 # Project
+.env
+.env.local
 *.db
 *.sqlite3
 *.log

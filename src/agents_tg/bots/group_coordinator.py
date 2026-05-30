@@ -32,14 +32,53 @@ class GroupCoordinator:
 
     def __init__(self, max_history: int = 100):
         self.max_history = max_history
-        self._history: Dict[int, List[GroupMessage]] = {}  # chat_id -> messages
-        self._group_members: Dict[int, set] = {}  # chat_id -> set of agent_keys
+        self._history: Dict[int, List[GroupMessage]] = {}
+        self._group_members: Dict[int, set] = {}
+        self._plans: Dict[int, List[str]] = {}
+        self._last_agent_reply: Dict[int, str] = {}
 
     def register_group(self, chat_id: int, agent_keys: List[str]):
         """Register a group with its participating agents."""
         self._group_members[chat_id] = set(agent_keys)
         self._history[chat_id] = []
         logger.info(f"Registered group {chat_id} with agents: {agent_keys}")
+
+    def set_plan(self, chat_id: int, plan: List[str]) -> None:
+        self._plans[chat_id] = list(plan)
+
+    def get_plan(self, chat_id: int) -> List[str]:
+        return self._plans.get(chat_id, [])
+
+    def format_plan(self, chat_id: int) -> str:
+        plan = self.get_plan(chat_id)
+        if not plan:
+            return ""
+        return "\n".join(f"{i + 1}. {step}" for i, step in enumerate(plan))
+
+    def should_skip_echo(self, chat_id: int, agent_key: str, text: str) -> bool:
+        """Anti-echo: skip if same agent repeats prior reply without new info."""
+        key = f"{chat_id}:{agent_key}"
+        prev = self._last_agent_reply.get(key, "")
+        if prev and text.strip() == prev.strip():
+            return True
+        self._last_agent_reply[key] = text
+        return False
+
+    def should_stay_silent(
+        self, chat_id: int, user_text: str, agent_key: str = "orchestrator"
+    ) -> bool:
+        """NO_REPLY when user acknowledges after another agent already answered."""
+        history = self._history.get(chat_id, [])
+        if len(history) < 1:
+            return False
+        last = history[-1]
+        if last.from_agent in ("user", agent_key):
+            return False
+        low = user_text.lower().strip()
+        if len(low) > 40:
+            return False
+        ack = ("ок", "спасибо", "понял", "ясно", "хорошо", "да", "+", "👍", "🙏")
+        return any(low == m or low.startswith(f"{m} ") for m in ack)
 
     def add_message(self, chat_id: int, message: GroupMessage):
         """Add a message to group history."""

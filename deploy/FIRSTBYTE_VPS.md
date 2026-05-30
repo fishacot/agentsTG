@@ -6,41 +6,50 @@ Production server: **91.186.221.32** (FirstByte FI), path `/opt/agentsTG`, syste
 
 - SSH access (root or `botsuser`)
 - All 7 `BOT_TOKEN_*` in `.env`
-- **Gemini API key** (free): https://aistudio.google.com/apikey
-- Groq API key as fallback
+- Groq API key (VPS: `LLM_PROVIDER_CHAIN=groq`)
+- Optional: Neon `DATABASE_URL` (reminders survive restart) — [`NEON_SETUP.md`](NEON_SETUP.md)
+- Optional: Upstash `REDIS_URL` (dedupe, run locks)
 
-## Required `.env` (LLM)
+## Required `.env` (runtime)
 
 ```env
-GEMINI_API_KEY=AIza...
 GROQ_API_KEY=gsk_...
-LLM_PROVIDER_CHAIN=gemini,groq
+LLM_PROVIDER_CHAIN=groq
+APP_TIMEZONE=Europe/Moscow
+HEALTH_PORT=8080
+MESSAGE_DEBOUNCE_MS=2000
+LLM_COOLDOWN_SEC=3.0
 ```
-
-Without `GEMINI_API_KEY` the bot falls back to Groq only and may hit **429 TPM** on long prompts.
 
 ## Update after git push
 
 ```bash
 cd /opt/agentsTG
 git pull
+# optional: alembic upgrade head
 sudo systemctl restart agents-tg
 sudo journalctl -u agents-tg -n 30
+curl -s http://127.0.0.1:8080/
 ```
 
-## Telegram acceptance
+## Telegram acceptance (agent autonomy)
 
-1. **Эльза** — «расскажи что ты можешь» → instant HTML, no error
-2. **Егор** — «привет» → reply from Egor only, no plan, no Elza voice
-3. **Руслан** — «hello world на Python» → code snippet
-4. Three messages in a row — no «перегрузка AI»
+See [`docs/E2E_AUTONOMY.md`](../docs/E2E_AUTONOMY.md).
+
+1. **Эльза** — «напомни через 3 минуты …» → подтверждение с МСК → ping
+2. **Руслан** — длинный код → 2–3 части `(1/N)`
+3. **Ульяна** — «найди …» → ack + финал отдельным сообщением
+4. **Егор** — план 2+ шагов → виден план + async итог
+5. **Health** — `curl :8080/` → `{"status":"ok"}`
 
 ## Logs
 
 ```bash
 sudo journalctl -u agents-tg -f
-grep -i "429\|rate\|gemini\|groq"  # check provider usage
+grep -E 'agents_tg.events|429|rate' 
 ```
+
+Structured events: logger `agents_tg.events` (JSON lines).
 
 ## RAM note
 

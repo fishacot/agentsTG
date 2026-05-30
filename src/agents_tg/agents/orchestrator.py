@@ -306,6 +306,12 @@ class Orchestrator:
         else:
             env_block = environment_block
 
+        if isinstance(environment, AgentEnvironment) and environment.is_group:
+            from src.agents_tg.bots.group_coordinator import get_coordinator
+
+            if get_coordinator().should_stay_silent(environment.chat_id, message):
+                return "NO_REPLY"
+
         tier = detect_prompt_tier(message, include_web_tools=False)
         if tier == PromptTier.LIGHT:
             return await agent_runner.run(
@@ -340,8 +346,17 @@ class Orchestrator:
         if direct:
             return direct
 
-        plan_str = ""
         plan = final_state.get("plan") or []
+        if plan and isinstance(environment, AgentEnvironment) and environment.is_group:
+            from src.agents_tg.bots.group_coordinator import get_coordinator
+
+            get_coordinator().set_plan(environment.chat_id, plan)
+
+        from src.agents_tg.services.orchestrator_project import maybe_bind_plan_to_project
+
+        await maybe_bind_plan_to_project(user_id, message, plan)
+
+        plan_str = ""
         if len(plan) >= 2:
             steps = "\n".join(f"{i + 1}. {step}" for i, step in enumerate(plan))
             plan_str = f"<b>План:</b>\n{steps}\n\n"

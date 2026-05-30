@@ -28,6 +28,7 @@ async def persist_user_fact(
     telegram_user_id: int,
     fact: str,
     agent_key: str | None = None,
+    category: str | None = None,
 ) -> None:
     factory = _session_factory()
     async with factory() as session:
@@ -44,6 +45,7 @@ async def persist_user_fact(
                 telegram_user_id=telegram_user_id,
                 fact=fact,
                 agent_key=agent_key,
+                category=category,
             )
         )
         await session.commit()

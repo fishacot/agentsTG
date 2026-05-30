@@ -83,6 +83,10 @@ class AppSettings(BaseSettings):
     # App
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
+    APP_TIMEZONE: str = "Europe/Moscow"
+    HEALTH_PORT: int = 8080
+    MESSAGE_DEBOUNCE_MS: int = 2000
+    LLM_COOLDOWN_SEC: float = 3.0
 
     # Paths
     ROOT_DIR: Path = Path(__file__).resolve().parent.parent.parent.parent

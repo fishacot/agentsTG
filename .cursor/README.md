@@ -15,8 +15,26 @@
 | `package-json-ci.mdc` | package.json | CI npm (если есть) |
 | `github-actions.mdc` | workflows | GitHub Actions |
 | `dependabot-config.mdc` | dependabot | Dependabot |
+| `team-kit-workflow.mdc` | да | Cursor Team Kit → Python workflow |
 
-## Commands
+## Hooks
+
+| Файл | Событие | Назначение |
+|------|---------|------------|
+| `hooks/ruff_after_py_edit.py` | afterFileEdit | Быстрый ruff check после правок `.py` |
+| `hooks/guard_destructive_shell.py` | beforeShellExecution | Подтверждение force-push / rm -rf |
+| `hooks/stop_verify_reminder.py` | stop | Напоминание pytest + implementation-notes |
+
+Конфиг: **`hooks.json`**. После правок перезагрузите окно Cursor (Hooks tab).
+
+## IDE (`.vscode/`)
+
+Рекомендуемые расширения — **`../.vscode/extensions.json`**. Установка:
+
+```powershell
+# Предпочтительно: Extensions → «Install Recommended Extensions»
+powershell -ExecutionPolicy Bypass -File scripts/install-cursor-extensions.ps1
+```
 
 preflight · plan-deep · verify · postflight · task-intake · confirm-acceptance · **implementation-notes**
 

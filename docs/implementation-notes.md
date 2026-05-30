@@ -6,6 +6,93 @@
 
 ---
 
+## 2026-05-30 — OpenClaw shared memory + project focus (verify)
+
+- **Schema:** `user_profiles`, `user_projects`, `project_activity`; `user_facts.category`; alembic `c3d5f7a2b104`
+- **Services:** `shared_context.py`, `bootstrap_context.py`, `workspace_memory.py`, `orchestrator_project.py`, `shared_context_tools.py`, `check_in_cooldown.py`
+- **Tools:** `update_user_profile`, `set_active_project`, `log_project_activity`, `update_project_status`; category on `remember_about_user`
+- **Bootstrap:** TIME/USER/FOCUS/MEMORY/TOOLS blocks → all 7 agents via `build_environment`
+- **Cross-agent:** auto-log after run (`agent_bot.py`); Егор binds plan → project; Эльza check-in 24h cooldown
+- **Files:** `agents/tools/*.md`, `workspace/users/{id}/USER.md`, `memory/YYYY-MM-DD.md`; docs `OPENCLAW_PARITY.md`, `E2E_AUTONOMY.md` (W3)
+- **Souls (shared focus):** `orchestrator.md`, `personal_assistant.md`, `coder_soul.md`, `security_ai.md`, `business_manager.md`, `marketing.md` — TOOLS + фокус проекта
+- **Fix:** circular import `shared_context_tools` ↔ `agent_runner` — lazy import в `run()`; bootstrap tests — `monkeypatch` на модульный `shared_context`
+- **Verify:** `python -m pytest tests/ -v --tb=short` → **77 passed** (~71s)
+- **Deploy VPS / Neon / smoke «сайт о собаках»:** не выполнялся; ждёт `DATABASE_URL` + явный «пуш» (см. `deploy/NEON_SETUP.md`, `docs/E2E_AUTONOMY.md` W3)
+
+---
+
+## 2026-05-30 — Verify: agents + souls (post master plan)
+
+- **Команда:** `python -m pytest tests/ -v --tb=short` → **69 passed** (~58s)
+- **Файлы в scope:** `orchestrator.py`, `personal_assistant.py`, souls (`orchestrator`, `personal_assistant`, `coder_soul`, `sports_analyst`, `security_ai`, `business_manager`, `marketing`)
+- **orchestrator.py:** `should_stay_silent` → `NO_REPLY` в группе после ack коллеге; plan в coordinator
+- **Souls:** секция **TOOLS (честные границы)** — не обещать напоминания/поиск/delegation без tool+runtime
+- **Deploy VPS / Neon:** без изменений; ждёт connection string и «пуш»
+
+---
+
+## 2026-05-30 — Agent autonomy master plan (W0–W2 complete)
+
+- **Runtime:** `agent_runtime.py`, `OutboundSink`, `send_telegram_message` tool, multi-bubble delivery
+- **Pipeline:** debounce, dedupe (Redis NX), followup queue, per-chat `run_lock`
+- **Reminders:** `reminder_service` MSK poll 30s; `schedule_reminder` tool; morning digest 09:00 after /start
+- **Neon:** `deploy/NEON_SETUP.md`; alembic `b2c4e8f1a903` (reminders, chat_messages, user_facts); `init_db` fallback
+- **Observability:** `/health` :8080; `structured_log.log_event`; per-user LLM cooldown (+ Redis)
+- **W2:** Ульяна background research; Егор async delegation; group NO_REPLY + anti-echo before send
+- **Souls:** TOOLS blocks for all 7 agents (honest boundaries)
+- **Tests:** +test_group_coordinator, test_message_pipeline, test_reminder_service
+- **CI:** `.github/workflows/test.yml` — redis/sqlalchemy deps, alembic heads
+- **Verify:** `python -m pytest tests/ -v`
+- **Deploy VPS:** не выполнялся (ждёт явного «пуш» от человека)
+
+---
+
+## 2026-05-30 — Agent runtime W0/W1 (старт): delivery + MSK + profiles
+
+- **Диагноз подтверждён:** chatbot (запрос→1 ответ), не автономные агенты. Master plan: `.cursor/plans/ruslan_+_elza_fixes_073e68b9.plan.md`
+- **Docs:** `docs/AGENT_RUNTIME.md`, `docs/OPENCLAW_PARITY.md`
+- **MSK:** `APP_TIMEZONE=Europe/Moscow`, `timezone_utils.py`, «Сейчас … МСК» в env block всех агентов
+- **Delivery:** `channels/telegram_delivery.py` — chunking 4096, multi-bubble `(1/N)`, retry; убран silent `[:4000]`
+- **Profiles:** `agent_delivery_profile.py` — 7 агентов; coder 1536 tokens, PA 3 tool rounds
+- **Runner:** per-profile max_tool_rounds; `_maybe_continue` при длинном ответе
+- **Tests:** test_timezone_utils, test_telegram_delivery, test_agent_delivery_profile — OK
+- **TODO next:** reminder_service (W1.7), AgentRuntime v1 (W1.2), message_pipeline (W1.3), Neon setup (W1.6)
+
+---
+
+- **CLI dev-tools (OK):** `ruff 0.11.11` (`pip`), `npm install` + `markdownlint-cli2` для docs verify.
+- **Расширения IDE:** конфиг `.vscode/extensions.json` (11 шт.); **CLI-установка зависает** на marketplace (`cursor --install-extension` → timeout на `ms-python.python`). Сейчас в Cursor только `anysphere.remote-ssh`, `anysphere.remote-wsl`. **Действие:** Extensions → «Install Recommended» или `scripts/install-cursor-extensions.ps1` когда сеть стабильна.
+- **Проект:** `.vscode/settings.json` (format on save, pytest, ruff); `.gitignore` — коммитим `extensions.json` + `settings.json`.
+- **Hooks:** `.cursor/hooks.json` + 3 Python-скрипта (ruff after edit, guard shell, verify reminder).
+- **Team Kit:** глобально в `~/.cursor/plugins/.../cursor-team-kit/`; правило `.cursor/rules/team-kit-workflow.mdc`.
+- **Док:** `docs/CURSOR_SETUP.md`, `.cursor/README.md`.
+- **После установки ext + pull:** Reload Window → Settings → Hooks.
+
+---
+
+## 2026-05-30 — Backlog: план на ~2 недели (следующая сессия)
+
+- **План (полный):** `.cursor/plans/2-week_agentstg_roadmap_75644e33.plan.md`
+- **Приоритет:** balanced (40% infra / 40% features / 20% dev workflow)
+- **Бюджет:** 1–2 тыс. ₽/мес — Neon PG, Upstash Redis, резерв на Groq/proxy
+- **Статус на сегодня:** скелет 7 агентов на VPS `a99eb59` ✅; к backlog не приступали
+
+### TODO (очередь)
+
+| ID | Задача | Неделя |
+|----|--------|--------|
+| `w1-postgres-redis` | Neon Postgres + Upstash Redis на VPS; persistence истории/фактов | 1 |
+| `w1-observability-llm` | `/health`, structured logs, per-user LLM cooldown, тесты PG/Redis | 1 |
+| `w2-async-research` | Фоновый `deep_research`: ack → worker → финальный ответ в TG | 2 |
+| `w2-group-orchestrator` | Plan visibility + anti-echo в group; E2E сценарий в docs | 2 |
+| `w2-dev-workflow` | Cursor hooks, CI, deploy по SSH key, ROADMAP/notes | 2 |
+
+### Отложено (после 2 недель)
+
+Ollama на VPS, vector RAG, Mem0 SaaS, E2B, webhook mode, streaming в TG.
+
+---
+
 ## 2026-05-30 — LLM-first + Groq TPM для всех 7 агентов
 
 - **Цель:** те же правки «интеллекта» (LLM-first, без шаблонов) для всех специалистов + снижение Groq 429 (TPM).

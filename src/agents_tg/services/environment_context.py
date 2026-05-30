@@ -31,6 +31,7 @@ class AgentEnvironment:
     memory_facts_count: int = 0
     notes_channel_configured: bool = False
     vault_path: str = "vault"
+    bootstrap_block: str = ""
 
     def to_prompt_block(self) -> str:
         identity = get_agent_identity(self.agent_key)
@@ -71,7 +72,10 @@ class AgentEnvironment:
             "- Действуй в рамках своей роли и этого чата. "
             "В группе отвечай сжато; в ЛС — развёрнуто."
         )
-        return "\n".join(lines)
+        base = "\n".join(lines)
+        if self.bootstrap_block:
+            return base + self.bootstrap_block
+        return base
 
 
 async def build_environment(
@@ -82,13 +86,18 @@ async def build_environment(
     tool_names: list[str] | None = None,
     dm_recent: str = "",
     group_context_lines: int = 18,
+    user_message: str = "",
 ) -> AgentEnvironment:
     """Build environment context from a Telegram message."""
+    from src.agents_tg.services.bootstrap_context import build_bootstrap_blocks
+    from src.agents_tg.services.prompt_builder import PromptTier, detect_prompt_tier
+
     settings = get_settings()
     is_group = message.chat.type in ("group", "supergroup")
     user = message.from_user
     user_id = str(user.id) if user else "default"
     username = user.username if user else None
+    tg_uid = int(user_id) if user_id.isdigit() else 0
 
     group_recent = ""
     if is_group and coordinator:
@@ -97,8 +106,41 @@ async def build_environment(
             n_messages=group_context_lines,
         )
 
-    facts = await memory_service.get_all(user_id)
-    facts_count = len(facts)
+    facts_raw = await memory_service.get_all(user_id)
+    facts_count = len(facts_raw)
+    fact_texts = [
+        (item.get("text") or item.get("memory") or "") for item in facts_raw
+    ]
+    fact_texts = [f for f in fact_texts if f]
+
+    tier = detect_prompt_tier(user_message or dm_recent)
+    include_web = agent_key in (
+        "research",
+        "coder",
+        "security_ai",
+        "business_manager",
+        "marketing",
+        "general",
+    )
+    if include_web:
+        tier = detect_prompt_tier(user_message, include_web_tools=True)
+
+    bootstrap = await build_bootstrap_blocks(
+        telegram_user_id=tg_uid,
+        agent_key=agent_key,
+        tier=tier,
+        identity_facts=fact_texts[:6],
+        all_facts=fact_texts,
+    )
+    bootstrap_block = "".join(
+        [
+            bootstrap["time_block"],
+            bootstrap["user_block"],
+            bootstrap["focus_block"],
+            bootstrap["memory_curated_block"],
+            bootstrap["tools_block"],
+        ]
+    )
 
     return AgentEnvironment(
         chat_type=str(message.chat.type),
@@ -113,4 +155,5 @@ async def build_environment(
         memory_facts_count=facts_count,
         notes_channel_configured=bool(settings.NOTES_CHANNEL_ID),
         vault_path=settings.OBSIDIAN_VAULT_PATH,
+        bootstrap_block=bootstrap_block,
     )

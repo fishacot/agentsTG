@@ -64,10 +64,12 @@ class MemoryService:
                 from src.agents_tg.services.user_facts_pg import persist_user_fact
 
                 agent = metadata.get("agent") if metadata else None
+                category = metadata.get("category") if metadata else None
                 await persist_user_fact(
                     telegram_user_id=int(user_id),
                     fact=text,
                     agent_key=str(agent) if agent else None,
+                    category=str(category) if category else None,
                 )
             except Exception as exc:
                 logger.warning("Postgres user fact persist failed: %s", exc)

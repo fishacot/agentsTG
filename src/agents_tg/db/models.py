@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, JSON, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.agents_tg.db.base import Base
@@ -132,7 +132,94 @@ class UserFact(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     telegram_user_id: Mapped[int] = mapped_column(index=True)
     fact: Mapped[str] = mapped_column(Text)
+    category: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     agent_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+
+class UserProfile(Base):
+    """Structured user profile (OpenClaw USER.md)."""
+
+    __tablename__ = "user_profiles"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    telegram_user_id: Mapped[int] = mapped_column(unique=True, index=True)
+    display_name: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    address_as: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    preferences_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class UserProject(Base):
+    """Active or archived user project (shared focus)."""
+
+    __tablename__ = "user_projects"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    telegram_user_id: Mapped[int] = mapped_column(index=True)
+    title: Mapped[str] = mapped_column(String(512))
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    activities: Mapped[list["ProjectActivity"]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+
+
+class ProjectActivity(Base):
+    """Cross-agent journal entry for a project."""
+
+    __tablename__ = "project_activity"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("user_projects.id"), index=True)
+    telegram_user_id: Mapped[int] = mapped_column(index=True)
+    agent_key: Mapped[str] = mapped_column(String(64))
+    kind: Mapped[str] = mapped_column(String(32), default="note")
+    summary: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    project: Mapped["UserProject"] = relationship(back_populates="activities")
+
+
+class Reminder(Base):
+    """Scheduled one-shot reminder delivered via Telegram."""
+
+    __tablename__ = "reminders"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    telegram_user_id: Mapped[int] = mapped_column(index=True)
+    chat_id: Mapped[int] = mapped_column(index=True)
+    agent_key: Mapped[str] = mapped_column(String(64), default="personal_assistant")
+    text: Mapped[str] = mapped_column(Text)
+    fire_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    timezone_name: Mapped[str] = mapped_column(String(64), default="Europe/Moscow")
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

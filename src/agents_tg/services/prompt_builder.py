@@ -223,7 +223,11 @@ def tools_for_tier(
     if tier == PromptTier.LIGHT:
         return []
     if tier == PromptTier.STANDARD:
-        allowed = {"remember_about_user"}
+        allowed = {
+            "remember_about_user",
+            "log_project_activity",
+            "update_project_status",
+        }
         if not include_web_tools and _TASK_LIST_PATTERN.search(user_message or ""):
             allowed.add("list_tasks")
         return [t for t in tool_list if t.name in allowed]

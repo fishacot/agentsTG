@@ -42,6 +42,7 @@ black = ">=26.5.1,<27.0.0"
 isort = ">=8.0.1,<9.0.0"
 flake8 = ">=7.3.0,<8.0.0"
 mypy = ">=2.1.0,<3.0.0"
+ruff = ">=0.11.0,<1.0.0"
 
 [tool.black]
 line-length = 88
@@ -77,3 +78,15 @@ markers = [
     "integration: integration test",
     "slow: slow test",
 ]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]

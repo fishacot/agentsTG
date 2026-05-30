@@ -1,0 +1,14 @@
+{
+  "name": "agents-tg-docs",
+  "private": true,
+  "description": "Markdown lint for docs and CursoRules workflow",
+  "scripts": {
+    "verify": "markdownlint-cli2 \"**/*.md\" \"#node_modules\" \"#CursoRules\""
+  },
+  "devDependencies": {
+    "markdownlint-cli2": "^0.17.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

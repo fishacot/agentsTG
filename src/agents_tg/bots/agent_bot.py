@@ -58,7 +58,7 @@ class AgentBot:
         self._register_error_handler()
         self.dp.include_router(self.router)
 
-        self.dp.message.middleware(RateLimitMiddleware(limit=3, window=60))
+        self.dp.message.middleware(RateLimitMiddleware(limit=5, window=60))
 
         logger.info("AgentBot initialized: %s (@%s)", agent_key, self.username)
 
@@ -84,6 +84,13 @@ class AgentBot:
             await state.set_state(AgentStates.idle)
             intro = self.identity.get("intro_dm", f"👋 Привет! Я {self.agent_key}")
             await message.answer(intro)
+            if self.agent_key == "personal_assistant" and message.from_user:
+                from src.agents_tg.services.reminder_service import reminder_service
+
+                await reminder_service.schedule_morning_digest_if_missing(
+                    chat_id=message.chat.id,
+                    user_id=message.from_user.id,
+                )
 
         @self.router.message(Command("help"))
         async def cmd_help(message: Message, state: FSMContext):
@@ -117,65 +124,190 @@ class AgentBot:
                 GroupMessage,
                 get_coordinator,
             )
+            from src.agents_tg.config.settings import get_settings
+            from src.agents_tg.services.message_pipeline import message_pipeline
 
             is_group = message.chat.type in ["group", "supergroup"]
             is_mention = self._is_mentioned(message)
 
-            # In groups, only respond to mentions
             if is_group and not is_mention:
                 return
 
-            coordinator = get_coordinator()
-            user_text = self._extract_user_text(message)
-            sender = "user" if message.from_user else "unknown"
+            if await message_pipeline.is_duplicate(
+                self.agent_key, message.chat.id, message.message_id
+            ):
+                return
 
-            if is_group:
-                coordinator.add_message(
-                    message.chat.id,
-                    GroupMessage(
-                        message_id=message.message_id,
-                        from_agent=sender,
-                        text=user_text,
-                        timestamp=datetime.now(timezone.utc),
-                        mentions=self._extract_mentions(message.text or ""),
-                    ),
+            settings = get_settings()
+            message_pipeline.debounce_sec = settings.MESSAGE_DEBOUNCE_MS / 1000.0
+
+            async def _run_handler(msg: Message, *, combined_text: str | None = None):
+                await self._handle_inbound(msg, state, combined_text=combined_text)
+
+            if settings.MESSAGE_DEBOUNCE_MS > 0 and not is_group:
+                await message_pipeline.enqueue_debounced(
+                    agent_key=self.agent_key,
+                    message=message,
+                    handler=_run_handler,
                 )
+            elif message_pipeline.is_busy(self.agent_key, message.chat.id):
+                message_pipeline.queue_followup(
+                    agent_key=self.agent_key,
+                    message=message,
+                    handler=_run_handler,
+                )
+            else:
+                await _run_handler(message)
 
+    async def _handle_inbound(
+        self,
+        message: Message,
+        state: FSMContext,
+        *,
+        combined_text: str | None = None,
+    ) -> None:
+        from src.agents_tg.bots.group_coordinator import GroupMessage, get_coordinator
+        from src.agents_tg.services.agent_delivery_profile import get_delivery_profile
+        from src.agents_tg.services.agent_runtime import agent_runtime
+        from src.agents_tg.services.background_runs import background_runs
+        from src.agents_tg.services.message_pipeline import message_pipeline
+        from src.agents_tg.services.orchestrator_delegate import maybe_delegate_async
+        from src.agents_tg.utils.structured_log import log_event
+        from src.agents_tg.utils.telegram_format import send_agent_response
+
+        is_group = message.chat.type in ["group", "supergroup"]
+        coordinator = get_coordinator()
+        user_text = combined_text or self._extract_user_text(message)
+        sender = "user" if message.from_user else "unknown"
+
+        if is_group:
+            coordinator.add_message(
+                message.chat.id,
+                GroupMessage(
+                    message_id=message.message_id,
+                    from_agent=sender,
+                    text=user_text,
+                    timestamp=datetime.now(timezone.utc),
+                    mentions=self._extract_mentions(message.text or ""),
+                ),
+            )
+
+        async with message_pipeline.run_lock(self.agent_key, message.chat.id):
             await state.set_state(AgentStates.processing)
             thinking_msg = await message.answer("🤖 Думаю...")
+            log_event(
+                "inbound_start",
+                agent=self.agent_key,
+                chat_id=message.chat.id,
+                user_id=message.from_user.id if message.from_user else None,
+                group=is_group,
+            )
 
             try:
-                response = await self._process_request(
+                # Background research for Ульяна on explicit search
+                if self.agent_key == "research" and self._is_research_intent(user_text):
+                    ack = await background_runs.run_research_background(
+                        message=message,
+                        user_text=user_text,
+                        process_fn=self._process_request,
+                        deliver_fn=self._deliver_extra_message,
+                    )
+                    profile = get_delivery_profile(self.agent_key)
+                    await send_agent_response(
+                        message,
+                        ack,
+                        reply_in_group=is_group,
+                        thinking_message=thinking_msg,
+                        chunk_limit=profile.text_chunk_limit,
+                    )
+                    return
+
+                run_result = await agent_runtime.run_inbound(
+                    agent_key=self.agent_key,
+                    process_fn=self._process_request,
                     message=message,
                     user_text=user_text,
                     is_group=is_group,
                     coordinator=coordinator,
                 )
 
-                if response:
-                    from src.agents_tg.utils.telegram_format import send_agent_response
+                if run_result.silent:
+                    await thinking_msg.delete()
+                    return
 
-                    sent = await send_agent_response(
-                        message,
-                        response,
-                        reply_in_group=is_group,
-                        thinking_message=thinking_msg,
-                    )
-                    if is_group and sent:
-                        coordinator.add_message(
-                            message.chat.id,
-                            GroupMessage(
-                                message_id=sent.message_id,
-                                from_agent=self.agent_key,
-                                text=response,
-                                timestamp=datetime.now(timezone.utc),
-                                mentions=self._extract_mentions(response),
-                            ),
-                        )
-                else:
+                if not run_result.messages:
                     await thinking_msg.edit_text(
                         "😕 Не смог обработать запрос. Попробуйте переформулировать."
                     )
+                    return
+
+                profile = get_delivery_profile(self.agent_key)
+                primary = run_result.primary or ""
+
+                if is_group and primary:
+                    if coordinator.should_skip_echo(
+                        message.chat.id, self.agent_key, primary
+                    ):
+                        log_event(
+                            "anti_echo_skip",
+                            agent=self.agent_key,
+                            chat_id=message.chat.id,
+                        )
+                        await thinking_msg.delete()
+                        return
+
+                if (
+                    self.agent_key == "orchestrator"
+                    and is_group
+                    and primary
+                ):
+                    plan = coordinator.get_plan(message.chat.id)
+                    primary = await maybe_delegate_async(
+                        plan=plan,
+                        primary_reply=primary,
+                        message=message,
+                        user_text=user_text,
+                        process_fn=self._process_request,
+                        deliver_fn=self._deliver_extra_message,
+                    )
+
+                sent = await send_agent_response(
+                    message,
+                    primary,
+                    reply_in_group=is_group,
+                    thinking_message=thinking_msg,
+                    chunk_limit=profile.text_chunk_limit,
+                )
+
+                for extra in run_result.extras:
+                    await send_agent_response(
+                        message,
+                        extra,
+                        reply_in_group=is_group,
+                        thinking_message=None,
+                        chunk_limit=profile.text_chunk_limit,
+                    )
+
+                if is_group and sent and primary:
+                    coordinator.add_message(
+                        message.chat.id,
+                        GroupMessage(
+                            message_id=sent.message_id,
+                            from_agent=self.agent_key,
+                            text=primary,
+                            timestamp=datetime.now(timezone.utc),
+                            mentions=self._extract_mentions(primary),
+                        ),
+                    )
+
+                log_event(
+                    "inbound_done",
+                    agent=self.agent_key,
+                    chat_id=message.chat.id,
+                    parts=1 + len(run_result.extras),
+                )
+
+                await self._auto_log_project_activity(message, primary)
 
             except Exception as e:
                 from src.agents_tg.services.llm_client import QwenAPIError, RateLimitError
@@ -200,6 +332,36 @@ class AgentBot:
 
             finally:
                 await state.set_state(AgentStates.idle)
+                await message_pipeline.drain_followups(
+                    self.agent_key, message.chat.id
+                )
+
+    @staticmethod
+    def _is_research_intent(text: str) -> bool:
+        low = text.lower()
+        markers = (
+            "найди",
+            "поиск",
+            "новост",
+            "актуальн",
+            "сравни",
+            "research",
+            "search",
+        )
+        return any(m in low for m in markers)
+
+    async def _deliver_extra_message(self, message: Message, text: str) -> None:
+        from src.agents_tg.services.agent_delivery_profile import get_delivery_profile
+        from src.agents_tg.utils.telegram_format import send_agent_response
+
+        profile = get_delivery_profile(self.agent_key)
+        await send_agent_response(
+            message,
+            text,
+            reply_in_group=False,
+            thinking_message=None,
+            chunk_limit=profile.text_chunk_limit,
+        )
 
     def _is_mentioned(self, message: Message) -> bool:
         """Check if this bot is mentioned in the message."""
@@ -277,18 +439,67 @@ class AgentBot:
 
     def _tool_names_for_agent(self) -> list[str]:
         """Tool names exposed to environment context."""
-        common = ["remember_about_user"]
+        common = [
+            "remember_about_user",
+            "log_project_activity",
+            "update_project_status",
+        ]
         if self.agent_key == "personal_assistant":
             return [
                 "create_obsidian_note",
                 "post_to_notes_channel",
                 "add_task",
                 "list_tasks",
+                "schedule_reminder",
+                "send_telegram_message",
+                "update_user_profile",
+                "set_active_project",
                 *common,
             ]
         if self.agent_key == "orchestrator":
-            return ["delegation", *common]
-        return ["deep_research", *common]
+            return [
+                "delegation",
+                "send_telegram_message",
+                "update_user_profile",
+                "set_active_project",
+                *common,
+            ]
+        return ["deep_research", "send_telegram_message", *common]
+
+    async def _auto_log_project_activity(
+        self,
+        message: Message,
+        reply_text: str,
+    ) -> None:
+        """Cross-agent journal entry after a successful run."""
+        if not message.from_user or not reply_text:
+            return
+        from src.agents_tg.services.shared_context import shared_context
+
+        uid = message.from_user.id
+        project = await shared_context.get_active_project(uid)
+        if not project:
+            return
+        plain = re.sub(r"<[^>]+>", "", reply_text)
+        summary = plain.strip()[:200]
+        if len(summary) < 20:
+            return
+        kind_map = {
+            "research": "research",
+            "coder": "code",
+            "business_manager": "plan",
+            "marketing": "marketing",
+            "security_ai": "security",
+            "orchestrator": "delegation",
+            "personal_assistant": "note",
+        }
+        await shared_context.log_activity(
+            uid,
+            agent_key=self.agent_key,
+            summary=summary,
+            kind=kind_map.get(self.agent_key, "note"),
+            project_id=project["id"],
+        )
 
     async def _process_request(
         self,
@@ -322,6 +533,7 @@ class AgentBot:
             tool_names=self._tool_names_for_agent(),
             dm_recent=dm_recent,
             group_context_lines=18,
+            user_message=user_text,
         )
 
         if self.agent_key == "orchestrator":

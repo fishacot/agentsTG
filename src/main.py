@@ -28,6 +28,8 @@ async def on_startup():
     logger.info("🚀 Starting Multi-Agent Bot System")
     logger.info("   6 Agents + 1 Orchestrator")
 
+    settings = get_settings()
+
     # Initialize database
     try:
         _db_engine = create_engine()
@@ -36,19 +38,40 @@ async def on_startup():
         from src.agents_tg.db.init_db import init_db
         from src.agents_tg.services.chat_history import chat_history
         from src.agents_tg.services.memory_service import memory_service
+        from src.agents_tg.services.reminder_service import reminder_service
+        from src.agents_tg.services.shared_context import shared_context
 
         async with _db_engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         await init_db(_db_engine)
         chat_history.set_pg_available(True)
         memory_service.set_pg_available(True)
+        reminder_service.set_pg_engine(_db_engine)
+        shared_context.set_pg_engine(_db_engine)
         logger.info("✅ Database connected and tables ensured")
     except Exception as e:
         logger.warning(f"⚠️ Database not available: {e}")
         logger.info("   Running without persistence")
 
-    # Log registered bots
     manager = get_bot_manager()
+
+    async def _reminder_send(
+        chat_id: int, user_id: int, body: str, agent_key: str
+    ) -> None:
+        bot = manager.get_bot(agent_key) or manager.get_bot("personal_assistant")
+        if not bot:
+            return
+        await bot.bot.send_message(chat_id=chat_id, text=body, parse_mode="HTML")
+
+    from src.agents_tg.services.reminder_service import reminder_service
+
+    reminder_service.set_send_fn(_reminder_send)
+    await reminder_service.start()
+
+    from src.agents_tg.services.health_server import start_health_server
+
+    await start_health_server(port=settings.HEALTH_PORT)
+
     logger.info(f"📡 Registered bots: {list(manager.bots.keys())}")
 
 
@@ -62,6 +85,12 @@ async def on_shutdown():
     logger = logging.getLogger(__name__)
 
     logger.info("🛑 Shutting down...")
+
+    from src.agents_tg.services.health_server import stop_health_server
+    from src.agents_tg.services.reminder_service import reminder_service
+
+    await reminder_service.stop()
+    await stop_health_server()
 
     # Stop all bots
     manager = get_bot_manager()
@@ -94,6 +123,7 @@ async def main() -> NoReturn:
         level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
+    logging.getLogger("agents_tg.events").setLevel(logging.INFO)
     logger = logging.getLogger(__name__)
 
     # Validate at least one bot token is set

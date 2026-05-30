@@ -8,7 +8,9 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
+from src.agents_tg.services.agent_delivery_profile import get_delivery_profile
 from src.agents_tg.services.agent_prompts import FINALIZE_USER_REPLY
+from src.agents_tg.services.agent_runtime import get_outbound_sink
 from src.agents_tg.services.agent_identity import get_agent_identity
 from src.agents_tg.services.chat_history import chat_history
 from src.agents_tg.services.environment_context import AgentEnvironment
@@ -66,24 +68,58 @@ def parse_tool_arguments(raw_args: str | None, user_id: str) -> dict[str, Any]:
     return args
 
 
+def send_telegram_message_tool() -> AgentTool:
+    """Allow agent to push an intermediate user-visible message during a run."""
+
+    async def handler(**kwargs: Any) -> str:
+        from src.agents_tg.services.agent_runtime import get_outbound_sink
+
+        text = str(kwargs.get("text", "")).strip()
+        if not text:
+            return tool_result(ok=False, error="empty_text")
+        sink = get_outbound_sink()
+        if sink is None:
+            return tool_result(ok=False, error="no_active_run")
+        sink.push(text)
+        return tool_result(ok=True, queued=True, length=len(text))
+
+    return AgentTool(
+        name="send_telegram_message",
+        description=(
+            "Отправить промежуточное сообщение пользователю в Telegram "
+            "(статус, «ищу…», уточнение). Финальный ответ всё равно сформулируй."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "Текст для пользователя (HTML)"},
+            },
+            "required": ["text"],
+        },
+        handler=handler,
+    )
+
+
 def _remember_tool(agent_key: str) -> AgentTool:
     async def handler(**kwargs: Any) -> str:
         fact = str(kwargs.get("fact", "")).strip()
         user_id = str(kwargs.get("user_id", "default"))
+        category = str(kwargs.get("category", "identity")).strip() or "identity"
         if not fact:
             return tool_result(ok=False, error="empty_fact")
         await memory_service.add(
             fact,
             user_id=user_id,
-            metadata={"agent": agent_key},
+            metadata={"agent": agent_key, "category": category},
         )
-        return tool_result(ok=True, stored=fact)
+        return tool_result(ok=True, stored=fact, category=category)
 
     return AgentTool(
         name="remember_about_user",
         description=(
-            "Сохранить факт о пользователе. Только когда он сообщает информацию о себе, "
-            "не на вопросы «ты помнишь?» / «можешь запоминать?»."
+            "Сохранить факт о пользователе (общая память всех агентов). "
+            "category: identity | preference | project. "
+            "Только когда он сообщает информацию о себе."
         ),
         parameters={
             "type": "object",
@@ -91,6 +127,11 @@ def _remember_tool(agent_key: str) -> AgentTool:
                 "fact": {
                     "type": "string",
                     "description": "Краткий факт о пользователе",
+                },
+                "category": {
+                    "type": "string",
+                    "enum": ["identity", "preference", "project"],
+                    "description": "Тип факта",
                 },
             },
             "required": ["fact"],
@@ -160,16 +201,25 @@ class AgentRunner:
         human_name = identity.get("human_name") or agent_key
         designation = identity.get("designation") or ""
 
+        profile = get_delivery_profile(agent_key)
+        max_tool_rounds = profile.max_tool_rounds
+
         tier = detect_prompt_tier(user_message, include_web_tools=include_web_tools)
+        profile_cap = profile.max_tokens
         if tier == PromptTier.LIGHT:
-            max_tokens = min(max_tokens, 512)
+            max_tokens = min(max_tokens, profile_cap, 512)
         elif tier == PromptTier.STANDARD:
-            max_tokens = min(max_tokens, 640)
+            max_tokens = min(max_tokens, profile_cap, 640)
         else:
-            max_tokens = min(max_tokens, 768)
+            max_tokens = min(max_tokens, profile_cap)
 
         tool_list = list(tools or [])
         tool_list.append(_remember_tool(agent_key))
+        from src.agents_tg.services.shared_context_tools import shared_context_tools
+
+        tool_list.extend(shared_context_tools(agent_key=agent_key))
+        if get_outbound_sink() is not None:
+            tool_list.append(send_telegram_message_tool())
         if include_web_tools:
             tool_list.append(deep_research_tool())
 
@@ -220,7 +270,7 @@ class AgentRunner:
         tools_used = False
 
         try:
-            for _ in range(self.MAX_TOOL_ROUNDS):
+            for _ in range(max_tool_rounds):
                 try:
                     result = await llm_client.chat_completion(
                         messages,
@@ -284,6 +334,13 @@ class AgentRunner:
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
+            final = await self._maybe_continue(
+                messages,
+                final,
+                agent_key=agent_key,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
         except RateLimitError:
             return self._RATE_LIMIT_REPLY
 
@@ -324,6 +381,43 @@ class AgentRunner:
             max_tokens=max_tokens,
             agent_key=agent_key,
         )
+
+    async def _maybe_continue(
+        self,
+        messages: list[dict[str, Any]],
+        text: str,
+        *,
+        agent_key: str,
+        temperature: float,
+        max_tokens: int,
+    ) -> str:
+        """One continuation if the model hit output length during finalize."""
+        if not text or len(text) < max_tokens // 2:
+            return text
+        continue_messages = list(messages)
+        continue_messages.append({"role": "assistant", "content": text})
+        continue_messages.append(
+            {
+                "role": "user",
+                "content": "Продолжи ответ с места обрыва. Не повторяй уже сказанное.",
+            }
+        )
+        try:
+            result = await llm_client.chat_completion(
+                continue_messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                agent_key=agent_key,
+                tools=None,
+            )
+        except RateLimitError:
+            return text
+        extra = (result.get("content") or "").strip()
+        if not extra:
+            return text
+        if result.get("finish_reason") == "length" and len(extra) > 100:
+            return text + "\n\n" + extra + "\n\n<i>(ответ сокращён — уточните детали)</i>"
+        return text + "\n\n" + extra
 
 
 agent_runner = AgentRunner()

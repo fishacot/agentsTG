@@ -1,0 +1,15 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+    "charliermarsh.ruff",
+    "DavidAnson.vscode-markdownlint",
+    "tamasfe.even-better-toml",
+    "redhat.vscode-yaml",
+    "eamodio.gitlens",
+    "ms-azuretools.vscode-docker",
+    "usernamehw.errorlens",
+    "anysphere.remote-ssh"
+  ]
+}

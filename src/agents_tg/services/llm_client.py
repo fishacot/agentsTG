@@ -21,6 +21,14 @@ from src.agents_tg.services.agent_models import (
 logger = logging.getLogger(__name__)
 
 _LLM_SEMAPHORE = asyncio.Semaphore(1)
+_AGENT_SEMAPHORES: dict[str, asyncio.Semaphore] = {}
+
+
+def _semaphore_for_agent(agent_key: str | None) -> asyncio.Semaphore:
+    key = agent_key or "default"
+    if key not in _AGENT_SEMAPHORES:
+        _AGENT_SEMAPHORES[key] = asyncio.Semaphore(2)
+    return _AGENT_SEMAPHORES[key]
 _RETRYABLE_STATUS = frozenset({429, 503})
 _MAX_ATTEMPTS = 6
 _BASE_DELAYS = (2.0, 3.0, 5.0, 8.0, 12.0, 15.0)
@@ -255,13 +263,15 @@ def _extract_message(result: Any) -> dict[str, Any]:
             message = choices[0].get("message") or {}
             content = message.get("content")
             tool_calls = message.get("tool_calls")
+            finish_reason = choices[0].get("finish_reason") or ""
             return {
                 "content": str(content).strip() if content else "",
                 "tool_calls": tool_calls or [],
+                "finish_reason": finish_reason,
             }
         text = _extract_text(result)
-        return {"content": text, "tool_calls": []}
-    return {"content": str(result), "tool_calls": []}
+        return {"content": text, "tool_calls": [], "finish_reason": ""}
+    return {"content": str(result), "tool_calls": [], "finish_reason": ""}
 
 
 def _extract_text(result: Any) -> str:
@@ -357,7 +367,8 @@ class LLMClient:
             raise QwenAPIError("No LLM provider configured (set GEMINI_API_KEY or GROQ_API_KEY)")
 
         errors: list[str] = []
-        async with _LLM_SEMAPHORE:
+        sem = _semaphore_for_agent(agent_key)
+        async with sem:
             for idx, provider in enumerate(chain):
                 resolved = model or self.model_for_agent(agent_key or "", provider.name)
                 has_next = idx < len(chain) - 1

@@ -1,0 +1,36 @@
+{
+  "python.defaultInterpreterPath": "python",
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["tests", "-v"],
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.autoImportCompletions": true,
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml"
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml"
+  },
+  "ruff.lineLength": 88,
+  "ruff.lint.select": ["E", "F", "I", "UP", "B"],
+  "ruff.organizeImports": true,
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true
+  },
+  "files.associations": {
+    "*.mdc": "markdown"
+  },
+  "errorLens.enabled": true,
+  "gitlens.codeLens.enabled": false
+}
