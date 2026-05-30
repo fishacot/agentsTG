@@ -16,7 +16,8 @@
   - Усилены промпты в `agent_prompts.py`, soul Эльзы (handoff на @ulyana_research_bot для новостей).
 - **Файлы:** `prompt_builder.py`, `personal_assistant.py`, `orchestrator.py`, `agent_prompts.py`, `personal_assistant.md`; удалён `capability_templates.py`.
 - **Verify:** pytest **48 passed**.
-- **Deploy:** не выполнен — нужен commit + push + VPS pull после подтверждения.
+- **Git:** commit `92ae0d5` → pushed `origin/master`.
+- **VPS (91.186.221.32):** `git reset --hard origin/master` → `92ae0d5`; `capability_templates.py` удалён на сервере; `agents-tg` **active**.
 
 ---
 
