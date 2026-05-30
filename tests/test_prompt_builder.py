@@ -54,3 +54,14 @@ def test_standard_tier_list_tasks_when_asked():
     ]
     active = tools_for_tier(tools, PromptTier.STANDARD, "покажи мои дела")
     assert {t.name for t in active} == {"remember_about_user", "list_tasks"}
+
+
+def test_web_standard_tier_no_deep_research():
+    tools = [
+        AgentTool(name="remember_about_user", description="d", parameters={}, handler=_dummy),
+        AgentTool(name="deep_research", description="d", parameters={}, handler=_dummy),
+    ]
+    active = tools_for_tier(
+        tools, PromptTier.STANDARD, "найди новости", include_web_tools=True
+    )
+    assert [t.name for t in active] == ["remember_about_user"]

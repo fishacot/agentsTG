@@ -41,6 +41,11 @@ _TASK_LIST_PATTERN = re.compile(
     r"(?i)(список\s+дел|мои\s+задачи|покажи\s+(?:мои\s+)?дела|"
     r"что\s+в\s+задачах|list\s+tasks|мои\s+дела)"
 )
+_RESEARCH_ACTION_PATTERN = re.compile(
+    r"(?i)(найди|найти|поиск|исследуй|research|deep_research|"
+    r"сводк|новост|актуальн|best practices|сравни|подбери|"
+    r"источник|ссылк|what'?s new|загугли|в интернете)"
+)
 
 # Explicit actions — full tools + soul
 _ACTION_PATTERN = re.compile(
@@ -73,7 +78,8 @@ def detect_prompt_tier(user_message: str, *, include_web_tools: bool = False) ->
     ):
         return PromptTier.LIGHT
     if include_web_tools and len(text) > 120:
-        return PromptTier.FULL
+        if _RESEARCH_ACTION_PATTERN.search(text) or _ACTION_PATTERN.search(text):
+            return PromptTier.FULL
     return PromptTier.STANDARD
 
 
@@ -178,11 +184,17 @@ def build_system_prompt(
     output_hints: str,
     include_web_tools: bool,
     user_id: str,
+    user_message: str = "",
 ) -> str:
     goal = light_goal_directive() if tier == PromptTier.LIGHT else GOAL_DIRECTIVE
     protocol = "" if tier == PromptTier.LIGHT else f"\n\n{TELEGRAM_AGENT_PROTOCOL}"
     html_fmt = TELEGRAM_HTML_FORMAT
-    web_hint = WEB_TOOL_HINT if include_web_tools and tier == PromptTier.FULL else ""
+    show_web = (
+        include_web_tools
+        and tier == PromptTier.FULL
+        and _RESEARCH_ACTION_PATTERN.search(user_message or "")
+    )
+    web_hint = WEB_TOOL_HINT if show_web else ""
     hints = f"\n\n{output_hints}" if output_hints and tier != PromptTier.LIGHT else ""
 
     return (
@@ -201,13 +213,23 @@ def tools_for_tier(
     tool_list: list,
     tier: PromptTier,
     user_message: str = "",
+    *,
+    include_web_tools: bool = False,
 ) -> list:
-    """LIGHT: no tools; STANDARD: remember only (+ list_tasks if explicitly asked); FULL: all."""
+    """LIGHT: no tools. STANDARD: remember only (+ list_tasks if asked).
+
+    FULL (PA): all domain tools. FULL (web): deep_research only on explicit search.
+    """
     if tier == PromptTier.LIGHT:
         return []
     if tier == PromptTier.STANDARD:
         allowed = {"remember_about_user"}
-        if _TASK_LIST_PATTERN.search(user_message or ""):
+        if not include_web_tools and _TASK_LIST_PATTERN.search(user_message or ""):
             allowed.add("list_tasks")
+        return [t for t in tool_list if t.name in allowed]
+    if include_web_tools:
+        allowed = {"remember_about_user"}
+        if _RESEARCH_ACTION_PATTERN.search(user_message or ""):
+            allowed.add("deep_research")
         return [t for t in tool_list if t.name in allowed]
     return tool_list

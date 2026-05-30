@@ -24,6 +24,7 @@ from src.agents_tg.services.llm_client import llm_client
 from src.agents_tg.services.memory_service import memory_service
 from src.agents_tg.services.prompt_builder import (
     PromptTier,
+    detect_prompt_tier,
     trim_env_block,
 )
 from src.agents_tg.services.supervisor_parse import parse_supervisor_response
@@ -154,7 +155,7 @@ class Orchestrator:
         response = await llm_client.chat(
             messages,
             temperature=0.1,
-            max_tokens=400,
+            max_tokens=280,
             agent_key="orchestrator",
             response_format={"type": "json_object"},
         )
@@ -170,7 +171,7 @@ class Orchestrator:
             response = await llm_client.chat(
                 messages,
                 temperature=0.1,
-                max_tokens=400,
+                max_tokens=280,
                 agent_key="orchestrator",
             )
             try:
@@ -297,12 +298,31 @@ class Orchestrator:
         environment_block: str = "",
     ) -> str:
         """Process a message through the graph."""
+        from src.agents_tg.services.agent_runner import agent_runner
         from src.agents_tg.services.environment_context import AgentEnvironment
 
         if isinstance(environment, AgentEnvironment):
             env_block = environment.to_prompt_block()
         else:
             env_block = environment_block
+
+        tier = detect_prompt_tier(message, include_web_tools=False)
+        if tier == PromptTier.LIGHT:
+            return await agent_runner.run(
+                agent_key="orchestrator",
+                soul=self._load_soul("orchestrator"),
+                user_message=message,
+                user_id=user_id,
+                output_hints=(
+                    "Приветствие и small talk — ответь сам от лица Егора, "
+                    "живым языком, без делегирования и без JSON."
+                ),
+                include_web_tools=False,
+                environment=environment if isinstance(environment, AgentEnvironment) else None,
+                environment_block=env_block,
+                temperature=0.5,
+                max_tokens=512,
+            )
 
         initial_state = {
             "messages": [HumanMessage(content=message)],

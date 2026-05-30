@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-05-30 — LLM-first + Groq TPM для всех 7 агентов
+
+- **Цель:** те же правки «интеллекта» (LLM-first, без шаблонов) для всех специалистов + снижение Groq 429 (TPM).
+- **prompt_builder / agent_runner:**
+  - `_RESEARCH_ACTION_PATTERN` — `deep_research` только при явном поиске (FULL + web agents).
+  - `tools_for_tier(..., include_web_tools=)` — STANDARD без deep_research; длинные сообщения → FULL только при search/action.
+  - `MAX_TOOL_ROUNDS=1`; history 4/8/12; max_tokens cap 512/640/768; WEB_TOOL_HINT только при research intent.
+- **specialists.py:** `MANUS_SPECIALIST_STYLE` + `max_tokens=768` для всех 6 специалистов.
+- **orchestrator.py:** LIGHT tier (привет/кто ты) → 1 вызов `agent_runner` вместо supervisor+specialist (экономия ~50% токенов на small talk); supervisor max_tokens 280.
+- **Souls:** границы LLM-first в `coder_soul`, `sports_analyst`, `security_ai`, `business_manager`, `marketing`, `general`, `orchestrator`.
+- **Файлы:** `prompt_builder.py`, `agent_runner.py`, `agent_prompts.py`, `specialists.py`, `orchestrator.py`, 7× souls, tests.
+- **Verify:** pytest **51 passed**.
+- **TODO deploy:** commit + push + VPS pull/restart (по запросу пользователя).
+
+---
+
 ## 2026-05-30 — LLM-first: убраны статические FAQ-ответы
 
 - **Проблема:** Эльза отвечала шаблоном на «кто ты» / «что можешь» (`capability_templates.py` fast-path) и вызывала `list_tasks` на «сводку новостей» → «нет в списке дел».

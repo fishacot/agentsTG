@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+from src.agents_tg.services.agent_prompts import MANUS_SPECIALIST_STYLE
 from src.agents_tg.services.agent_runner import agent_runner
 
 logger = logging.getLogger(__name__)
@@ -67,16 +68,18 @@ class GoalOrientedAgent:
         from src.agents_tg.services.environment_context import AgentEnvironment
 
         env = environment if isinstance(environment, AgentEnvironment) else None
+        hints = f"{MANUS_SPECIALIST_STYLE}\n\n{self.output_hints}"
         return await agent_runner.run(
             agent_key=self.agent_key,
             soul=self._load_soul(),
             user_message=user_message,
             user_id=user_id,
-            output_hints=self.output_hints,
+            output_hints=hints,
             include_web_tools=True,
             environment=env,
             environment_block=environment_block,
             temperature=0.35,
+            max_tokens=768,
         )
 
 

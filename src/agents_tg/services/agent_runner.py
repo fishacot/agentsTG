@@ -135,7 +135,7 @@ def deep_research_tool() -> AgentTool:
 class AgentRunner:
     """Run an agent: understand the goal, use tools only when needed."""
 
-    MAX_TOOL_ROUNDS = 2
+    MAX_TOOL_ROUNDS = 1
     _RATE_LIMIT_REPLY = (
         "⏳ Сейчас перегрузка AI (лимит Groq). "
         "Подождите 15–30 секунд и повторите."
@@ -164,11 +164,13 @@ class AgentRunner:
         if tier == PromptTier.LIGHT:
             max_tokens = min(max_tokens, 512)
         elif tier == PromptTier.STANDARD:
+            max_tokens = min(max_tokens, 640)
+        else:
             max_tokens = min(max_tokens, 768)
 
         tool_list = list(tools or [])
         tool_list.append(_remember_tool(agent_key))
-        if include_web_tools and tier == PromptTier.FULL:
+        if include_web_tools:
             tool_list.append(deep_research_tool())
 
         if environment:
@@ -188,7 +190,7 @@ class AgentRunner:
         history_turns = await chat_history.get_recent(
             user_id,
             agent_key,
-            limit=6 if tier == PromptTier.LIGHT else 12,
+            limit=4 if tier == PromptTier.LIGHT else (8 if tier == PromptTier.STANDARD else 12),
         )
         history_raw = chat_history.format_for_prompt(history_turns)
 
@@ -203,9 +205,12 @@ class AgentRunner:
             output_hints=output_hints,
             include_web_tools=include_web_tools,
             user_id=user_id,
+            user_message=user_message,
         )
 
-        active_tools = tools_for_tier(tool_list, tier, user_message)
+        active_tools = tools_for_tier(
+            tool_list, tier, user_message, include_web_tools=include_web_tools
+        )
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": system},
             {"role": "user", "content": user_message},

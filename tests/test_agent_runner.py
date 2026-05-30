@@ -62,6 +62,21 @@ def test_light_tier_strips_tools():
     assert standard[0].name == "remember_about_user"
 
 
+def test_web_full_tier_research_only_with_explicit_search():
+    tools = [
+        AgentTool(name="remember_about_user", description="d", parameters={}, handler=_noop),
+        AgentTool(name="deep_research", description="d", parameters={}, handler=_noop),
+    ]
+    no_search = tools_for_tier(
+        tools, PromptTier.FULL, "напиши план MVP", include_web_tools=True
+    )
+    assert [t.name for t in no_search] == ["remember_about_user"]
+    with_search = tools_for_tier(
+        tools, PromptTier.FULL, "найди best practices", include_web_tools=True
+    )
+    assert {t.name for t in with_search} == {"remember_about_user", "deep_research"}
+
+
 def test_parse_tool_arguments_null():
     from src.agents_tg.services.agent_runner import parse_tool_arguments
 
