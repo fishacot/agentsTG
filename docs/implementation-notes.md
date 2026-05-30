@@ -18,7 +18,8 @@
 - **Souls:** границы LLM-first в `coder_soul`, `sports_analyst`, `security_ai`, `business_manager`, `marketing`, `general`, `orchestrator`.
 - **Файлы:** `prompt_builder.py`, `agent_runner.py`, `agent_prompts.py`, `specialists.py`, `orchestrator.py`, 7× souls, tests.
 - **Verify:** pytest **51 passed**.
-- **TODO deploy:** commit + push + VPS pull/restart (по запросу пользователя).
+- **Git:** commit `a99eb59` → pushed `origin/master`.
+- **VPS (91.186.221.32):** `git reset --hard origin/master` → `a99eb59`; `agents-tg` **active**.
 
 ---
 
