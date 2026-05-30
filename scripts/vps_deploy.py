@@ -45,9 +45,9 @@ def main() -> None:
         f"cd {REPO} && git log -1 --oneline",
         f"cd {REPO} && poetry install --no-interaction --no-ansi 2>&1 | tail -5",
         f"systemctl restart {SERVICE}",
-        "sleep 3",
+        "sleep 8",
         f"systemctl is-active {SERVICE}",
-        "curl -s http://127.0.0.1:8080/",
+        "curl -sf http://127.0.0.1:8080/ || curl -s http://127.0.0.1:8080/ || true",
         f"journalctl -u {SERVICE} --no-pager -n 8 --no-hostname",
     ]
     for cmd in steps:

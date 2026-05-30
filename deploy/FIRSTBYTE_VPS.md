@@ -32,6 +32,13 @@ sudo journalctl -u agents-tg -n 30
 curl -s http://127.0.0.1:8080/
 ```
 
+**С локальной машины (Windows):** после `git push origin master`:
+
+```powershell
+$env:VPS_SSH_PASSWORD='...'   # не коммитить
+python scripts/vps_deploy.py
+```
+
 ## Telegram acceptance (agent autonomy)
 
 See [`docs/E2E_AUTONOMY.md`](../docs/E2E_AUTONOMY.md).

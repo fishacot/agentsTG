@@ -12,7 +12,7 @@
 - **Причина:** `message_pipeline.enqueue_debounced` оборачивал handler в `run_lock`, а `_handle_inbound` в `agent_bot.py` берёт тот же lock → **deadlock** на DM (MESSAGE_DEBOUNCE_MS=2000).
 - **Фикс:** убран внешний `run_lock` из `_flush`; handler сам сериализует чат.
 - **Файлы:** `src/agents_tg/services/message_pipeline.py`, `tests/test_message_pipeline.py`
-- **VPS:** hotfix залит SFTP + `systemctl restart agents-tg` → **active**
+- **VPS:** `git reset --hard origin/master` → **`23b2d3d`**; `agents-tg` **active**; health `{"status":"ok"}`
 - **Verify:** `pytest tests/test_message_pipeline.py` — 3 passed
 
 ## 2026-05-30 — Push + VPS deploy OpenClaw (64e6001)

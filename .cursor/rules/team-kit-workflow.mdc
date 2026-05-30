@@ -12,6 +12,7 @@ alwaysApply: true
 | `verify-this` | «докажи что работает» | `python -m pytest tests/ -v` + Telegram приёмка из `deploy/FIRSTBYTE_VPS.md` |
 | `check-compiler-errors` | после правок types | `python -m mypy src/` |
 | `fix-ci` / `loop-on-ci` | упал GitHub Actions | Task `ci-watcher` или `gh run list` |
+| `review-and-ship` / `new-branch-and-pr` | после правок на **master** (hotfix) | **verify → commit → push → `python scripts/vps_deploy.py`** (env `VPS_SSH_PASSWORD`) → `docs/implementation-notes.md` |
 | `review-and-ship` / `new-branch-and-pr` | готовим PR | `gh pr create` + `docs/implementation-notes.md` |
 | `deslop` | большой AI-diff | thermo-nuclear review перед merge |
 | `ci-watcher` subagent | ждём CI | только на PR, не на каждый commit |
