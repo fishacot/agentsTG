@@ -14,6 +14,7 @@ USER = "root"
 REPO = "/opt/agentsTG"
 SERVICE = "agents-tg"
 BRANCH = "master"
+POETRY = "/home/botsuser/.local/bin/poetry"
 
 
 def _safe_print(text: str) -> None:
@@ -52,9 +53,9 @@ def main() -> None:
     alembic_cmd = (
         f"cd {REPO} && "
         "if [ -f .env ] && grep -q '^DATABASE_URL=.*@' .env; then "
-        "sudo -u botsuser bash -lc 'cd /opt/agentsTG && "
-        "source .venv/bin/activate 2>/dev/null || true; "
-        "poetry run alembic upgrade head 2>&1 || python -m alembic upgrade head 2>&1'; "
+        f"sudo -u botsuser bash -lc 'cd {REPO} && "
+        "PYTHONPATH=/opt/agentsTG "
+        f"{POETRY} run alembic upgrade head 2>&1'; "
         "else echo 'SKIP alembic: DATABASE_URL not configured'; fi"
     )
 
@@ -62,13 +63,32 @@ def main() -> None:
         f"cd {REPO} && git fetch origin {BRANCH}",
         f"cd {REPO} && git reset --hard origin/{BRANCH}",
         f"cd {REPO} && git log -1 --oneline",
-        f"cd {REPO} && test -f workspace/HEARTBEAT.default.md && echo HEARTBEAT.default.md OK || echo HEARTBEAT.default.md MISSING",
+        (
+            f"cd {REPO} && "
+            "test -f deploy/HEARTBEAT.default.md && echo deploy/HEARTBEAT.default.md OK "
+            "|| echo deploy/HEARTBEAT.default.md MISSING"
+        ),
+        (
+            f"cd {REPO} && "
+            "mkdir -p workspace && "
+            "cp -n deploy/HEARTBEAT.default.md workspace/HEARTBEAT.default.md 2>/dev/null || "
+            "cp deploy/HEARTBEAT.default.md workspace/HEARTBEAT.default.md; "
+            "test -f workspace/HEARTBEAT.default.md && echo workspace/HEARTBEAT.default.md OK "
+            "|| echo workspace/HEARTBEAT.default.md MISSING"
+        ),
         alembic_cmd,
-        f"cd {REPO} && sudo -u botsuser bash -lc 'poetry install --no-interaction --no-ansi 2>&1 | tail -5' || true",
+        (
+            f"cd {REPO} && sudo -u botsuser bash -lc "
+            f"'{POETRY} install --no-interaction --no-ansi 2>&1 | tail -5' || true"
+        ),
         f"systemctl restart {SERVICE}",
         "sleep 8",
         f"systemctl is-active {SERVICE}",
         "curl -sf http://127.0.0.1:8080/ || curl -s http://127.0.0.1:8080/ || true",
+        (
+            f"journalctl -u {SERVICE} --no-pager -n 20 --no-hostname | "
+            "grep -E 'Database connected|without persistence|AgentWakeService' || true"
+        ),
         f"journalctl -u {SERVICE} --no-pager -n 12 --no-hostname",
     ]
     for cmd in steps:

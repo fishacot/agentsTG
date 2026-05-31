@@ -88,11 +88,15 @@ def load_heartbeat_md(telegram_user_id: int) -> str:
     user_path = (
         settings.ROOT_DIR / "workspace" / "users" / str(telegram_user_id) / "HEARTBEAT.md"
     )
-    default_path = settings.ROOT_DIR / "workspace" / "HEARTBEAT.default.md"
+    default_paths = (
+        settings.ROOT_DIR / "workspace" / "HEARTBEAT.default.md",
+        settings.ROOT_DIR / "deploy" / "HEARTBEAT.default.md",
+    )
     if user_path.exists():
         return user_path.read_text(encoding="utf-8").strip()
-    if default_path.exists():
-        return default_path.read_text(encoding="utf-8").strip()
+    for default_path in default_paths:
+        if default_path.exists():
+            return default_path.read_text(encoding="utf-8").strip()
     return (
         "- Открытые задачи?\n"
         "- Активный проект?\n"

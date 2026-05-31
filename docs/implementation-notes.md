@@ -6,6 +6,17 @@
 
 ---
 
+## 2026-05-31 — CI green + VPS deploy hardening (full plan) ✅
+
+- **Цель:** зелёный CI (pytest + alembic), HEARTBEAT на VPS, alembic PYTHONPATH, poetry install в workflow
+- **Файлы:** `.github/workflows/test.yml`, `alembic.ini`, `env.py`, `deploy/HEARTBEAT.default.md`, `workspace_memory.py`, `scripts/vps_deploy.py`
+- **CI fix:** `poetry install --only main,dev` вместо ручного pip (duckduckgo-search, trafilatura, greenlet и др.)
+- **Alembic fix:** `env.py` → `parents[4]` (repo root); `prepend_sys_path = .`; импорт `UserTask`, `UserContact`
+- **HEARTBEAT:** git-tracked `deploy/HEARTBEAT.default.md`; fallback в `load_heartbeat_md`; bootstrap `workspace/` в `vps_deploy.py`
+- **VPS deploy:** `PYTHONPATH=/opt/agentsTG`, poetry path `/home/botsuser/.local/bin/poetry`, grep persistence в journalctl
+- **Verify локально:** flake8 clean, `alembic heads` → `d4e6f8a0c205`, **84 passed**
+- **VPS PG:** если `DATABASE_URL` = localhost — persistence in-memory; Neon — см. `deploy/NEON_SETUP.md` (не в git)
+
 ## 2026-05-31 — CI fix + deploy hardening ✅
 
 - **CI email (GitHub Actions run #10):** упал шаг **Lint** (flake8), не pytest — pytest даже не запускался

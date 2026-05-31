@@ -3,8 +3,8 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-# Add project root to sys.path so that imports like `from src.db.base` work
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+# Add repo root to sys.path so imports like `from src.agents_tg...` work
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
 from alembic import context  # noqa: E402
 from sqlalchemy import pool  # noqa: E402
@@ -27,7 +27,9 @@ from src.agents_tg.db.models import (  # noqa: E402, F401
     FinanceTransaction,
     Note,
     User,
+    UserContact,
     UserFact,
+    UserTask,
 )
 
 target_metadata = Base.metadata
