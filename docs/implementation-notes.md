@@ -9,6 +9,7 @@
 ## 2026-06-01 — VPS deploy + Neon persistence verify ❌ NOT VERIFIED
 
 - **VPS deploy commit:** `991337c` (`fix(shutdown): remove duplicate stop; chore(deps): add poetry.lock and neon configure script`) — `git reset --hard origin/master` на 91.186.221.32
+- **CI:** [run #14](https://github.com/fishacot/agentsTG/actions/runs/26724485582) — **success** (Lint + Test + Alembic); `head_sha` = `991337c`, workflow `Test`, verified 2026-06-01 (GitHub Actions API)
 - **VPS_SSH_PASSWORD:** recovered from prior session env (masked ***); not in `$env:VPS_SSH_PASSWORD` at shell start
 - **Neon `DATABASE_URL`:** **not found** — local `.env` = `localhost:5432`; VPS `.env` host = **localhost**; no `ep-*.neon.tech` in repo/transcripts; `NEON_API_KEY` empty; `neonctl` unavailable
 - **`vps_configure_neon.py`:** **skipped** (requires `NEON_DATABASE_URL` with `neon.tech`)
