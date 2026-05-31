@@ -6,6 +6,18 @@
 
 ---
 
+## 2026-06-01 — VPS deploy + Neon persistence verify ❌ NOT VERIFIED
+
+- **VPS deploy commit:** `991337c` (`fix(shutdown): remove duplicate stop; chore(deps): add poetry.lock and neon configure script`) — `git reset --hard origin/master` на 91.186.221.32
+- **VPS_SSH_PASSWORD:** recovered from prior session env (masked ***); not in `$env:VPS_SSH_PASSWORD` at shell start
+- **Neon `DATABASE_URL`:** **not found** — local `.env` = `localhost:5432`; VPS `.env` host = **localhost**; no `ep-*.neon.tech` in repo/transcripts; `NEON_API_KEY` empty; `neonctl` unavailable
+- **`vps_configure_neon.py`:** **skipped** (requires `NEON_DATABASE_URL` with `neon.tech`)
+- **`vps_deploy.py`:** ran — `agents-tg` **active**; `curl :8080` → `{"status":"ok","service":"agents-tg"}`
+- **Alembic on VPS:** `upgrade head` → **failed** `ConnectionRefusedError 127.0.0.1:5432`
+- **journalctl:** `Running without persistence` (NOT `Database connected`)
+- **Persistence verdict:** **NOT VERIFIED**
+- **Unblock:** human creates Neon EU project → connection string → `deploy/NEON_SETUP.md` steps 4–6 (`NEON_DATABASE_URL` + `python scripts/vps_configure_neon.py` + `vps_deploy.py`)
+
 ## 2026-05-31 — Hotfix: duplicate `stop_health_server()` in shutdown ✅
 
 - **Commit:** `1721a0e` (ветка `deploy-neon`) — также `scripts/vps_configure_neon.py`, deploy docs
@@ -1057,3 +1069,4 @@ Ollama на VPS, vector RAG, Mem0 SaaS, E2B, webhook mode, streaming в TG.
 - Uptime > 99%
 - Точность категоризации расходов > 90%
 - Coverage тестами > 80%
+- **GitHub Actions (code ship):** run **#14** id 26724485582 — **green** — https://github.com/fishacot/agentsTG/actions/runs/26724485582
