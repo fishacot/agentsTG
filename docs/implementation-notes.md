@@ -10,11 +10,12 @@
 
 - **Persistence verdict:** **NOT VERIFIED** — journalctl: `Running without persistence` (not `Database connected`)
 - **DATABASE_URL host (VPS):** **localhost:5432** (`postgresql+asyncpg://user:***@localhost:5432/agents_tg`)
-- **VPS:** `991337c` on 91.186.221.32; `agents-tg` **active**; `curl :8080` → `{"status":"ok","service":"agents-tg"}`
+- **Ship commit (code):** `991337c` — shutdown fix, `poetry.lock`, `vps_configure_neon.py`
+- **VPS:** `79f05f9` on 91.186.221.32 (`vps_deploy.py` 2026-06-01); `agents-tg` **active**; `curl :8080` → `{"status":"ok","service":"agents-tg"}`
 - **CI:** [run #14](https://github.com/fishacot/agentsTG/actions/runs/26724485582) — **success**; `head_sha` = `991337c`
 - **Neon credential search:** `$env:NEON_*` / `DATABASE_URL` empty; local `.env` = localhost only; no `ep-*.neon.tech` in repo/transcript `5e8f932f`; `npx neonctl projects list` → OAuth browser, **auth timed out** (non-interactive)
 - **`vps_configure_neon.py`:** **skipped** (no `NEON_DATABASE_URL`)
-- **`vps_deploy.py`:** not re-run this pass (nothing to configure)
+- **`vps_deploy.py`:** **re-run** 2026-06-01 → VPS `79f05f9`; `agents-tg` **active**; alembic still `ConnectionRefusedError` localhost:5432
 - **Alembic on VPS:** `ConnectionRefusedError` `127.0.0.1:5432`
 - **VPS_SSH_PASSWORD:** used for SSH re-audit (***); set `$env:VPS_SSH_PASSWORD` locally for deploy scripts
 - **Unblock:** Neon EU project + connection string → `$env:NEON_DATABASE_URL` + `vps_configure_neon.py` + `vps_deploy.py` → journalctl must show `Database connected`
