@@ -207,6 +207,45 @@ class ProjectActivity(Base):
     project: Mapped["UserProject"] = relationship(back_populates="activities")
 
 
+class UserTask(Base):
+    """User to-do item persisted in Postgres."""
+
+    __tablename__ = "user_tasks"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    telegram_user_id: Mapped[int] = mapped_column(index=True)
+    title: Mapped[str] = mapped_column(String(512))
+    due_date: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+
+class UserContact(Base):
+    """Last known DM chat for proactive wake / digest delivery."""
+
+    __tablename__ = "user_contacts"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    telegram_user_id: Mapped[int] = mapped_column(index=True)
+    chat_id: Mapped[int] = mapped_column(index=True)
+    agent_key: Mapped[str] = mapped_column(String(64), default="personal_assistant")
+    last_inbound_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    last_outbound_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    last_heartbeat_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
 class Reminder(Base):
     """Scheduled one-shot reminder delivered via Telegram."""
 

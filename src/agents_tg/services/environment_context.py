@@ -157,3 +157,59 @@ async def build_environment(
         vault_path=settings.OBSIDIAN_VAULT_PATH,
         bootstrap_block=bootstrap_block,
     )
+
+
+async def build_environment_scheduled(
+    *,
+    telegram_user_id: int,
+    chat_id: int,
+    agent_key: str,
+    user_message: str = "",
+    dm_recent: str = "",
+) -> AgentEnvironment:
+    """Build environment for proactive runs without a real Telegram Message."""
+    from src.agents_tg.services.bootstrap_context import build_bootstrap_blocks
+    from src.agents_tg.services.prompt_builder import detect_prompt_tier
+
+    settings = get_settings()
+    user_id = str(telegram_user_id)
+    facts_raw = await memory_service.get_all(user_id)
+    facts_count = len(facts_raw)
+    fact_texts = [
+        (item.get("text") or item.get("memory") or "") for item in facts_raw
+    ]
+    fact_texts = [f for f in fact_texts if f]
+
+    tier = detect_prompt_tier(user_message or dm_recent)
+    bootstrap = await build_bootstrap_blocks(
+        telegram_user_id=telegram_user_id,
+        agent_key=agent_key,
+        tier=tier,
+        identity_facts=fact_texts[:6],
+        all_facts=fact_texts,
+    )
+    bootstrap_block = "".join(
+        [
+            bootstrap["time_block"],
+            bootstrap["user_block"],
+            bootstrap["focus_block"],
+            bootstrap["memory_curated_block"],
+            bootstrap["tools_block"],
+        ]
+    )
+
+    return AgentEnvironment(
+        chat_type="private",
+        chat_id=chat_id,
+        user_id=user_id,
+        user_username=None,
+        agent_key=agent_key,
+        is_group=False,
+        group_recent="",
+        dm_recent=dm_recent,
+        tool_names=[],
+        memory_facts_count=facts_count,
+        notes_channel_configured=bool(settings.NOTES_CHANNEL_ID),
+        vault_path=settings.OBSIDIAN_VAULT_PATH,
+        bootstrap_block=bootstrap_block,
+    )

@@ -88,6 +88,13 @@ class AppSettings(BaseSettings):
     MESSAGE_DEBOUNCE_MS: int = 2000
     LLM_COOLDOWN_SEC: float = 3.0
 
+    # Proactive agent wake (OpenClaw heartbeat parity)
+    HEARTBEAT_ENABLED: bool = True
+    HEARTBEAT_INTERVAL_MIN: int = 60
+    HEARTBEAT_QUIET_HOURS: float = 12.0
+    HEARTBEAT_SKIP_IF_BUSY_MIN: int = 5
+    HEARTBEAT_DIGEST_LLM: bool = True
+
     # Paths
     ROOT_DIR: Path = Path(__file__).resolve().parent.parent.parent.parent
 

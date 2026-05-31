@@ -29,7 +29,6 @@ class PersonalAssistant:
             os.makedirs(self.obsidian_vault_path)
 
         self._soul_path = Path(__file__).parent / "souls" / "personal_assistant.md"
-        self.tasks: List[Dict[str, Any]] = []
 
     def _load_soul(self) -> str:
         if self._soul_path.exists():
@@ -82,35 +81,31 @@ class PersonalAssistant:
             "sync_error": sync_error,
         }
 
-    async def add_task(self, title: str, due_date: Optional[str] = None) -> dict[str, Any]:
-        """Add a task to ToDo list."""
-        task = {
-            "title": title,
-            "due_date": due_date,
-            "status": "pending",
-            "created_at": datetime.now().isoformat(),
-        }
-        self.tasks.append(task)
-        return {
-            "ok": True,
-            "title": title,
-            "due_date": due_date,
-            "total_tasks": len(self.tasks),
-        }
+    async def add_task(
+        self,
+        title: str,
+        due_date: Optional[str] = None,
+        *,
+        telegram_user_id: int = 0,
+    ) -> dict[str, Any]:
+        """Add a task to the user's to-do list."""
+        from src.agents_tg.services.user_tasks_service import user_tasks_service
 
-    async def list_tasks(self) -> dict[str, Any]:
-        """List current tasks."""
-        return {
-            "ok": True,
-            "tasks": [
-                {
-                    "title": t["title"],
-                    "due_date": t["due_date"],
-                    "status": t["status"],
-                }
-                for t in self.tasks
-            ],
-        }
+        if not telegram_user_id:
+            return {"ok": False, "error": "missing_user"}
+        return await user_tasks_service.add_task(
+            telegram_user_id=telegram_user_id,
+            title=title,
+            due_date=due_date,
+        )
+
+    async def list_tasks(self, *, telegram_user_id: int = 0) -> dict[str, Any]:
+        """List current tasks for a user."""
+        from src.agents_tg.services.user_tasks_service import user_tasks_service
+
+        if not telegram_user_id:
+            return {"ok": False, "error": "missing_user", "tasks": []}
+        return await user_tasks_service.list_tasks(telegram_user_id=telegram_user_id)
 
     def _tools(self, chat_id: int = 0, telegram_user_id: int = 0) -> list[AgentTool]:
         pa = self
@@ -138,12 +133,16 @@ class PersonalAssistant:
             if not title:
                 return tool_result(ok=False, error="empty_title")
             data = await pa.add_task(
-                title, due_date=str(due_date) if due_date else None
+                title,
+                due_date=str(due_date) if due_date else None,
+                telegram_user_id=int(kwargs.get("telegram_user_id") or uid or 0),
             )
             return tool_result(**data)
 
         async def list_tasks_handler(**kwargs: Any) -> str:
-            data = await pa.list_tasks()
+            data = await pa.list_tasks(
+                telegram_user_id=int(kwargs.get("telegram_user_id") or uid or 0),
+            )
             return tool_result(**data)
 
         async def schedule_reminder_handler(**kwargs: Any) -> str:

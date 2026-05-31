@@ -180,6 +180,15 @@ class AgentBot:
         user_text = combined_text or self._extract_user_text(message)
         sender = "user" if message.from_user else "unknown"
 
+        if not is_group and message.from_user:
+            from src.agents_tg.services.user_contact_service import user_contact_service
+
+            await user_contact_service.record_inbound(
+                telegram_user_id=message.from_user.id,
+                chat_id=message.chat.id,
+                agent_key=self.agent_key,
+            )
+
         if is_group:
             coordinator.add_message(
                 message.chat.id,

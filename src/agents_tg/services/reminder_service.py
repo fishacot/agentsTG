@@ -19,6 +19,7 @@ MORNING_DIGEST_TEXT = (
 )
 
 SendFn = Callable[[int, int, str, str], Awaitable[None]]
+DigestFn = Callable[[int, int], Awaitable[None]]
 
 
 @dataclass
@@ -40,6 +41,7 @@ class ReminderService:
         self._next_id = 1
         self._scheduler: Any | None = None
         self._send_fn: SendFn | None = None
+        self._digest_fn: DigestFn | None = None
         self._pg_engine: Any | None = None
         self._poll_task: asyncio.Task | None = None
 
@@ -48,6 +50,9 @@ class ReminderService:
 
     def set_send_fn(self, fn: SendFn) -> None:
         self._send_fn = fn
+
+    def set_digest_fn(self, fn: DigestFn) -> None:
+        self._digest_fn = fn
 
     async def schedule(
         self,
@@ -231,14 +236,21 @@ class ReminderService:
     ) -> None:
         is_digest = text.startswith(MORNING_DIGEST_MARKER)
         display = text[len(MORNING_DIGEST_MARKER) :] if is_digest else text
-        body = f"⏰ <b>Напоминание</b>\n{display}"
-        if self._send_fn:
+
+        if is_digest and self._digest_fn:
             try:
-                await self._send_fn(chat_id, user_id, body, agent_key)
+                await self._digest_fn(chat_id, user_id)
             except Exception as exc:
-                logger.error("Reminder delivery failed: %s", exc)
+                logger.error("Digest delivery failed: %s", exc)
         else:
-            logger.warning("No send_fn for reminder to chat %s", chat_id)
+            body = f"⏰ <b>Напоминание</b>\n{display}"
+            if self._send_fn:
+                try:
+                    await self._send_fn(chat_id, user_id, body, agent_key)
+                except Exception as exc:
+                    logger.error("Reminder delivery failed: %s", exc)
+            else:
+                logger.warning("No send_fn for reminder to chat %s", chat_id)
 
         if is_digest:
             await self.schedule_morning_digest_if_missing(chat_id, user_id)

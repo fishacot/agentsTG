@@ -40,6 +40,8 @@ async def on_startup():
         from src.agents_tg.services.memory_service import memory_service
         from src.agents_tg.services.reminder_service import reminder_service
         from src.agents_tg.services.shared_context import shared_context
+        from src.agents_tg.services.user_contact_service import user_contact_service
+        from src.agents_tg.services.user_tasks_service import user_tasks_service
 
         async with _db_engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
@@ -48,6 +50,8 @@ async def on_startup():
         memory_service.set_pg_available(True)
         reminder_service.set_pg_engine(_db_engine)
         shared_context.set_pg_engine(_db_engine)
+        user_tasks_service.set_pg_engine(_db_engine)
+        user_contact_service.set_pg_engine(_db_engine)
         logger.info("✅ Database connected and tables ensured")
     except Exception as e:
         logger.warning(f"⚠️ Database not available: {e}")
@@ -63,10 +67,32 @@ async def on_startup():
             return
         await bot.bot.send_message(chat_id=chat_id, text=body, parse_mode="HTML")
 
+    async def _wake_send(
+        chat_id: int, user_id: int, body: str, agent_key: str
+    ) -> None:
+        bot = manager.get_bot(agent_key) or manager.get_bot("personal_assistant")
+        if not bot:
+            return
+        await bot.bot.send_message(chat_id=chat_id, text=body)
+
+    from src.agents_tg.services.agent_wake import agent_wake_service
     from src.agents_tg.services.reminder_service import reminder_service
 
+    pa_bot = manager.get_bot("personal_assistant")
+    if pa_bot:
+
+        async def _pa_scheduled_process(message, user_text, is_group, coordinator):
+            return await pa_bot._process_request(
+                message, user_text, is_group, coordinator
+            )
+
+        agent_wake_service.set_process_fn(_pa_scheduled_process)
+
+    agent_wake_service.set_send_fn(_wake_send)
     reminder_service.set_send_fn(_reminder_send)
+    reminder_service.set_digest_fn(agent_wake_service.run_morning_digest)
     await reminder_service.start()
+    await agent_wake_service.start()
 
     from src.agents_tg.services.health_server import start_health_server
 
@@ -87,9 +113,12 @@ async def on_shutdown():
     logger.info("🛑 Shutting down...")
 
     from src.agents_tg.services.health_server import stop_health_server
+    from src.agents_tg.services.agent_wake import agent_wake_service
     from src.agents_tg.services.reminder_service import reminder_service
 
+    await agent_wake_service.stop()
     await reminder_service.stop()
+    await stop_health_server()
     await stop_health_server()
 
     # Stop all bots

@@ -81,3 +81,21 @@ def refresh_memory_md(
         for f in facts[-10:]:
             lines.append(f"  - {f[:200]}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def load_heartbeat_md(telegram_user_id: int) -> str:
+    """Load per-user HEARTBEAT checklist or repo default."""
+    settings = get_settings()
+    user_path = (
+        settings.ROOT_DIR / "workspace" / "users" / str(telegram_user_id) / "HEARTBEAT.md"
+    )
+    default_path = settings.ROOT_DIR / "workspace" / "HEARTBEAT.default.md"
+    if user_path.exists():
+        return user_path.read_text(encoding="utf-8").strip()
+    if default_path.exists():
+        return default_path.read_text(encoding="utf-8").strip()
+    return (
+        "- Открытые задачи?\n"
+        "- Активный проект?\n"
+        "Если нечего сказать — ответь HEARTBEAT_OK."
+    )

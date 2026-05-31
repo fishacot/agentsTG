@@ -6,6 +6,24 @@
 
 ---
 
+## 2026-05-30 — Verify: Agent Wake (полный pytest) ✅
+
+- **Команда:** `python -m pytest tests/ -v --tb=short` (docs/PROJECT_VERIFICATION.md)
+- **Результат:** **84 passed** in ~28s
+- **Затронутые файлы (scope):** `personal_assistant.py`, `souls/personal_assistant.md`, `agent_bot.py`, `settings.py`, `models.py`, `agent_runtime.py`, `environment_context.py`, `reminder_service.py` + новые `agent_wake.py`, `user_*_service.py`, `main.py`, тесты `test_agent_wake.py`, `test_user_tasks_service.py`
+- **Статус Phase 0–1:** код готов; prod E2E W2 и Neon на VPS — ещё не проверены
+
+## 2026-05-30 — Phase 0–1: Agent Wake (heartbeat + LLM digest) 🚧
+
+- **Scope creep отклонён (не never):** grammY/TS gateway, OpenClaw Node plugins, LanceDB, Neo4j, Temporal, e2b — отдельные epics; сейчас Python/aiogram + Neon PG достаточно.
+- **P0:** `user_tasks`, `user_contacts` (models + alembic `d4e6f8a0c205`); `user_tasks_service`, `user_contact_service`; `scripts/agent_status.py`; tasks в PG вместо in-memory.
+- **P1:** `AgentRuntime.run_scheduled()`, `AgentWakeService`, `workspace/HEARTBEAT.default.md`, env `HEARTBEAT_*`.
+- **Интеграция:** `main.py` стартует wake loop; утренний digest через LLM (`HEARTBEAT_DIGEST_LLM`); `record_inbound` в `agent_bot`; soul Эльзы обновлён.
+- **Файлы:** `agent_wake.py`, `agent_runtime.py`, `reminder_service.py`, `environment_context.py`, `personal_assistant.py`, `models.py`, `settings.py`
+- **Verify:** `python -m pytest tests/ -v --tb=short` — **84 passed** (2026-05-30)
+- **TODO VPS:** Neon `DATABASE_URL` + `alembic upgrade head` на 91.186.221.32 (контакты/задачи/reminders в PG)
+- **E2E:** пользователь молчит 12h+ → proactive LLM (см. `docs/E2E_AUTONOMY.md` W2)
+
 ## 2026-05-30 — Hotfix: Эльза молчит в DM (debounce deadlock) ✅
 
 - **Симптом:** после деплоя `64e6001` личные сообщения `@elliza_pa_bot` — полная тишина, нет даже «🤖 Думаю…»; в логах `Update … Duration 27 ms`, нет `inbound_start`.

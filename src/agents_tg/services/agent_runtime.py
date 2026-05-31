@@ -130,5 +130,76 @@ class AgentRuntime:
         finally:
             set_outbound_sink(None)
 
+    async def run_scheduled(
+        self,
+        *,
+        agent_key: str,
+        telegram_user_id: int,
+        chat_id: int,
+        user_text: str,
+        trigger: TriggerKind,
+        process_fn: ProcessFn,
+        coordinator: Any = None,
+        skip_cooldown: bool = True,
+    ) -> AgentRunResult:
+        """Proactive agent turn (cron, heartbeat, event wake) without inbound message."""
+        from types import SimpleNamespace
+
+        sink = OutboundSink()
+        set_outbound_sink(sink)
+        try:
+            from src.agents_tg.utils.structured_log import log_event
+
+            log_event(
+                "scheduled_start",
+                agent=agent_key,
+                user_id=telegram_user_id,
+                chat_id=chat_id,
+                trigger=trigger.value,
+            )
+
+            if not skip_cooldown:
+                from src.agents_tg.services.llm_cooldown import llm_cooldown
+
+                user_id = str(telegram_user_id)
+                allowed, wait_sec = await llm_cooldown.check(user_id)
+                if not allowed:
+                    log_event("llm_cooldown", user_id=user_id, wait_sec=wait_sec)
+                    return AgentRunResult(silent=True)
+
+            message = SimpleNamespace(
+                chat=SimpleNamespace(id=chat_id, type="private"),
+                from_user=SimpleNamespace(id=telegram_user_id, username=None),
+            )
+
+            reply = await process_fn(
+                message=message,
+                user_text=user_text,
+                is_group=False,
+                coordinator=coordinator,
+            )
+
+            if not skip_cooldown:
+                from src.agents_tg.services.llm_cooldown import llm_cooldown
+
+                await llm_cooldown.record(str(telegram_user_id))
+
+            if reply and reply.strip().upper() in (SILENT_REPLY, "NO_REPLY", "HEARTBEAT_OK"):
+                return AgentRunResult(silent=True)
+
+            messages = sink.messages
+            if reply and reply.strip():
+                cleaned = reply.strip()
+                if cleaned.upper() != "HEARTBEAT_OK":
+                    if not messages or messages[-1] != cleaned:
+                        messages.append(cleaned)
+
+            if not messages:
+                return AgentRunResult(messages=[])
+
+            return AgentRunResult(messages=messages)
+        finally:
+            set_outbound_sink(None)
+
 
 agent_runtime = AgentRuntime()
