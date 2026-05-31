@@ -11,8 +11,6 @@ from src.agents_tg.services.agent_prompts import (
     TELEGRAM_HTML_FORMAT,
     WEB_TOOL_HINT,
 )
-from src.agents_tg.services.environment_context import AgentEnvironment
-
 # Greetings and meta — minimal prompt, no tools (LLM still answers)
 _LIGHT_GREETING = re.compile(
     r"^(?:"

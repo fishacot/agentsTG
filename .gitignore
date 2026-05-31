@@ -1,7 +1,7 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
+*\.class
 *.so
 *.egg-info/
 dist/
@@ -65,3 +65,6 @@ dmypy.json
 
 # Pytest
 .pytest_cache/
+
+# Local VPS log snapshots
+vps_logs_out.txt

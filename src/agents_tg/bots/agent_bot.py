@@ -120,10 +120,6 @@ class AgentBot:
         @self.router.message()
         async def handle_message(message: Message, state: FSMContext):
             """Handle direct messages and group mentions."""
-            from src.agents_tg.bots.group_coordinator import (
-                GroupMessage,
-                get_coordinator,
-            )
             from src.agents_tg.config.settings import get_settings
             from src.agents_tg.services.message_pipeline import message_pipeline
 

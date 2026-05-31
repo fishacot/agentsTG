@@ -5,7 +5,6 @@ from src.agents_tg.services.llm_client import (
     LLMClient,
     QwenAPIError,
     RateLimitError,
-    llm_client,
     parse_retry_after_seconds,
     qwen_client,
 )

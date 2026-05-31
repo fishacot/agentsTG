@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from src.agents_tg.config.settings import get_settings
 from src.agents_tg.services.agent_identity import AGENT_IDENTITIES, get_agent_identity
@@ -90,7 +90,7 @@ async def build_environment(
 ) -> AgentEnvironment:
     """Build environment context from a Telegram message."""
     from src.agents_tg.services.bootstrap_context import build_bootstrap_blocks
-    from src.agents_tg.services.prompt_builder import PromptTier, detect_prompt_tier
+    from src.agents_tg.services.prompt_builder import detect_prompt_tier
 
     settings = get_settings()
     is_group = message.chat.type in ("group", "supergroup")

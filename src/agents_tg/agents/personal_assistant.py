@@ -5,7 +5,7 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from src.agents_tg.config.settings import get_settings
 from src.agents_tg.services.agent_prompts import MANUS_PA_STYLE

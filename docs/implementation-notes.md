@@ -6,6 +6,25 @@
 
 ---
 
+## 2026-05-31 — CI fix + deploy hardening ✅
+
+- **CI email (GitHub Actions run #10):** упал шаг **Lint** (flake8), не pytest — pytest даже не запускался
+- **Причины:** сотни E501 в legacy-коде; F401/F541/E305 в нескольких файлах; `alembic.ini` указывал на несуществующий `src/db/migrations`
+- **Фиксы:** `.flake8` extend-ignore E501; unused imports; `alembic.ini` → `src/agents_tg/db/migrations`; `agent_status.py` sys.path bootstrap; `vps_deploy.py` safe print + conditional alembic
+- **Verify локально:** flake8 clean, `alembic heads` → `d4e6f8a0c205`, **84 passed**
+- **VPS (не конфиг):** код на `338ce57` уже был; **PG всё ещё offline** — `DATABASE_URL` на VPS = localhost:5432, Neon не настроен → tasks/reminders/contacts in-memory
+
+## 2026-05-31 — Deploy VPS: Agent Wake `338ce57` ✅
+
+- **Git push:** `ef233cf..338ce57` → `origin/master`
+- **VPS:** `91.186.221.32` — `git reset --hard origin/master` → **`338ce57`**
+- **systemd:** `agents-tg` **active** (pid 25098 после restart)
+- **Логи:** `AgentWakeService started (interval=60 min, quiet=12.0h)` — патч поднялся
+- **Health:** `:8080` listening
+- **7 ботов:** polling OK (@elliza_pa_bot и остальные)
+- **Известные ограничения:** PG localhost:5432 недоступен → in-memory fallback (Neon `DATABASE_URL` ещё не в `.env` на VPS); `poetry` не в PATH non-interactive shell (не блокер — venv systemd уже есть)
+- **Deploy script:** локальный exit 1 из-за Unicode emoji в journalctl на Windows — на сервере deploy успешен
+
 ## 2026-05-30 — Verify: Agent Wake (полный pytest) ✅
 
 - **Команда:** `python -m pytest tests/ -v --tb=short` (docs/PROJECT_VERIFICATION.md)

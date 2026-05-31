@@ -30,7 +30,7 @@ async def maybe_delegate_async(
         "\n\n⏳ План из нескольких шагов — выполню остальное "
         "и пришлю итог отдельным сообщением."
     )
-    base = primary_reply if primary_reply else f"<b>План:</b>\n" + "\n".join(
+    base = primary_reply if primary_reply else "<b>План:</b>\n" + "\n".join(
         f"{i + 1}. {s}" for i, s in enumerate(plan)
     )
 

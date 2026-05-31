@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 
 from src.agents_tg.utils.timezone_utils import get_app_tz, now_local
 

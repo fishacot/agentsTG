@@ -29,6 +29,8 @@ def _semaphore_for_agent(agent_key: str | None) -> asyncio.Semaphore:
     if key not in _AGENT_SEMAPHORES:
         _AGENT_SEMAPHORES[key] = asyncio.Semaphore(2)
     return _AGENT_SEMAPHORES[key]
+
+
 _RETRYABLE_STATUS = frozenset({429, 503})
 _MAX_ATTEMPTS = 6
 _BASE_DELAYS = (2.0, 3.0, 5.0, 8.0, 12.0, 15.0)
