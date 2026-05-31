@@ -8,9 +8,10 @@
 
 ## 2026-05-31 — Hotfix: duplicate `stop_health_server()` in shutdown ✅
 
+- **Commit:** `1721a0e` (ветка `deploy-neon`) — также `scripts/vps_configure_neon.py`, deploy docs
 - **Файл:** `src/main.py` — в `on_shutdown()` удалён второй подряд `await stop_health_server()` (copy-paste)
 - **Поведение:** `stop_health_server()` идемпотентен (`_server_task` → `None` после первого вызова), но дубликат был лишним
-- **Verify:** `python -m pytest tests/ -v --tb=short` — **84 passed** (~124s)
+- **Verify (повтор):** `python -m pytest tests/ -v --tb=short` — **84 passed** (~68s, 2026-05-31)
 
 ## 2026-05-31 — CI green + VPS deploy hardening (full plan) ✅
 
