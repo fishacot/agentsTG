@@ -8,14 +8,17 @@
 
 ## 2026-05-31 — CI green + VPS deploy hardening (full plan) ✅
 
-- **Цель:** зелёный CI (pytest + alembic), HEARTBEAT на VPS, alembic PYTHONPATH, poetry install в workflow
+- **Commit:** `e9b5659` — `fix(ci): green pytest, alembic path, HEARTBEAT deploy`
+- **Push:** `e5049f0..e9b5659` → `origin/master`
 - **Файлы:** `.github/workflows/test.yml`, `alembic.ini`, `env.py`, `deploy/HEARTBEAT.default.md`, `workspace_memory.py`, `scripts/vps_deploy.py`
 - **CI fix:** `poetry install --only main,dev` вместо ручного pip (duckduckgo-search, trafilatura, greenlet и др.)
 - **Alembic fix:** `env.py` → `parents[4]` (repo root); `prepend_sys_path = .`; импорт `UserTask`, `UserContact`
 - **HEARTBEAT:** git-tracked `deploy/HEARTBEAT.default.md`; fallback в `load_heartbeat_md`; bootstrap `workspace/` в `vps_deploy.py`
-- **VPS deploy:** `PYTHONPATH=/opt/agentsTG`, poetry path `/home/botsuser/.local/bin/poetry`, grep persistence в journalctl
+- **VPS deploy (91.186.221.32):** git → `e9b5659`; `deploy/HEARTBEAT.default.md OK`; `workspace/HEARTBEAT.default.md OK`; `agents-tg` **active**
+- **Alembic на VPS:** import path **исправлен** (нет `ModuleNotFoundError: src`); upgrade падает на `ConnectionRefusedError 127.0.0.1:5432` — `DATABASE_URL` = localhost, Neon не настроен
+- **Poetry на VPS:** `pyproject.toml changed significantly since poetry.lock` — lock не синхронизирован (CI ставит через poetry install; VPS venv уже есть)
 - **Verify локально:** flake8 clean, `alembic heads` → `d4e6f8a0c205`, **84 passed**
-- **VPS PG:** если `DATABASE_URL` = localhost — persistence in-memory; Neon — см. `deploy/NEON_SETUP.md` (не в git)
+- **Блокер persistence:** Neon `DATABASE_URL` в `.env` на VPS — см. `deploy/NEON_SETUP.md`
 
 ## 2026-05-31 — CI fix + deploy hardening ✅
 
