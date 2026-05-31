@@ -1,0 +1,20 @@
+{
+  "autoRun": {
+    "allow_instructions": [
+      "User pre-authorized autonomous agent and subagent work on agentsTG: verify, commit, push, VPS deploy, Neon configure — do not ask for confirmation unless blocked by block_instructions.",
+      "Allow read-only shell: git status/log/diff/fetch, pytest, flake8, mypy, alembic heads/current, poetry check, npm run verify, gh run list, curl health checks, journalctl grep.",
+      "Allow writes in this repo: src/, tests/, scripts/, docs/, deploy/, .github/, pyproject.toml, poetry.lock, alembic.ini, env.py migrations.",
+      "Allow git add, commit, push origin master for ship/deploy cycles when user authorized automation in chat.",
+      "Allow python scripts/vps_deploy.py and scripts/vps_configure_neon.py when VPS_SSH_PASSWORD is set; never log or commit secrets.",
+      "Allow read-only MCP, WebFetch, WebSearch for CI logs, GitHub API, neon.tech docs.",
+      "Allow Task subagents to run the full cycle: plan, execute, verify, commit, push, VPS patch, log verify."
+    ],
+    "block_instructions": [
+      "Block git push --force to master or main.",
+      "Block deleting files, git reset --hard, or repo-wide mass replace unless user explicitly requested in the current message.",
+      "Block committing .env, credentials, VPS passwords, or Neon connection strings.",
+      "Block editing CursoRules/ unless the task is explicitly about CursoRules.",
+      "Block skip hooks (--no-verify) unless user explicitly requested."
+    ]
+  }
+}

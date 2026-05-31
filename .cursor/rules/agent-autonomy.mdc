@@ -1,0 +1,23 @@
+---
+description: Pre-authorized agent/subagent autonomy for verify-ship-deploy cycles
+alwaysApply: true
+---
+
+# Agent autonomy (pre-authorized)
+
+Human authorized **automatic execution** for agents and subagents on this repo without repeated permission prompts.
+
+## Allowed without asking
+
+- Local verify: pytest, flake8, alembic, poetry check
+- Git: status, diff, commit, push `origin master` for ship work
+- VPS: `scripts/vps_deploy.py`, `scripts/vps_configure_neon.py` (env secrets only)
+- CI: `gh run list`, GitHub API, ci-watcher subagent
+- `docs/implementation-notes.md` updates (no secrets)
+
+## Still ask or block
+
+- Force push, delete files, mass replace, CI/hooks skip — only with explicit human message
+- Never commit `.env` or credentials
+
+Policy detail: `.cursor/permissions.json` (Auto-review classifier).

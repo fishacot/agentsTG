@@ -11,9 +11,15 @@ from sqlalchemy import pool  # noqa: E402
 from sqlalchemy.engine import Connection  # noqa: E402
 from sqlalchemy.ext.asyncio import async_engine_from_config  # noqa: E402
 
+from src.agents_tg.config.settings import get_settings  # noqa: E402
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# Prefer DATABASE_URL from .env / environment (VPS Neon), not alembic.ini localhost default.
+_db_url = get_settings().async_database_url
+config.set_main_option("sqlalchemy.url", _db_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

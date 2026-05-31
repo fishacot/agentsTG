@@ -6,6 +6,17 @@
 
 ---
 
+## 2026-06-01 — Alembic loads VPS `.env` + Neon ship cycle 🚧
+
+- **Root cause:** `env.py` used `alembic.ini` default `localhost:5432`; VPS `.env` had Neon `DATABASE_URL` but migrations ignored it → `ConnectionRefusedError`.
+- **Fix:** `src/agents_tg/db/migrations/env.py` — `get_settings().async_database_url` → `config.set_main_option("sqlalchemy.url", …)` before online/offline runs.
+- **VPS script:** `scripts/vps_configure_neon.py` — `agent_status` via `{POETRY} run python` (not bare `python3`).
+- **Ops:** `scripts/neon_provision.py` (API provision EU); temp `scripts/_neon_*`, `*_out.txt`, `neon_uri.txt` removed + `.gitignore`.
+- **Cursor:** `.cursor/permissions.json`, `.cursor/rules/agent-autonomy.mdc` — pre-authorized verify/ship/deploy (no secrets in repo).
+- **Neon project (VPS API):** `agentsTG`, region `aws-eu-central-1`, host `ep-long-dawn-*.neon.tech` (credentials only in env, not committed).
+- **Verify local (2026-05-31, post `env.py`):** `python -m pytest tests/ -v --tb=short` — **84 passed** in 22.78s.
+- **Post-commit:** push → CI green → `vps_deploy.py` → `vps_configure_neon.py` → journalctl `Database connected` (update verdict below).
+
 ## 2026-06-01 — Neon persistence full cycle ❌ NOT VERIFIED
 
 - **Persistence verdict:** **NOT VERIFIED** — journalctl: `Running without persistence` (not `Database connected`)

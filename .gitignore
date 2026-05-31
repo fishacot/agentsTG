@@ -65,3 +65,10 @@ dmypy.json
 
 # Local VPS log snapshots
 vps_logs_out.txt
+vps_neon_out.txt
+neon_uri.txt
+neon_provision_out.txt
+
+# Neon one-off helpers (not shipped)
+scripts/_neon_api_once.py
+scripts/_run_neon_on_vps.py

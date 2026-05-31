@@ -108,7 +108,8 @@ def main() -> None:
         ),
         (
             f"cd {REPO} && sudo -u botsuser bash -lc 'cd {REPO} && "
-            f"PYTHONPATH={REPO} python3 scripts/agent_status.py 2>&1 | head -20'"
+            f"PYTHONPATH={REPO} {POETRY} run python scripts/agent_status.py "
+            f"2>&1 | head -20'"
         ),
     ]
     for cmd in steps:
