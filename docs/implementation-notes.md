@@ -6,18 +6,18 @@
 
 ---
 
-## 2026-06-01 — VPS deploy + Neon persistence verify ❌ NOT VERIFIED
+## 2026-06-01 — Neon persistence full cycle ❌ NOT VERIFIED
 
-- **VPS deploy commit:** `991337c` (`fix(shutdown): remove duplicate stop; chore(deps): add poetry.lock and neon configure script`) — `git reset --hard origin/master` на 91.186.221.32
-- **CI:** [run #14](https://github.com/fishacot/agentsTG/actions/runs/26724485582) — **success** (Lint + Test + Alembic); `head_sha` = `991337c`, workflow `Test`, verified 2026-06-01 (GitHub Actions API)
-- **VPS_SSH_PASSWORD:** recovered from prior session env (masked ***); not in `$env:VPS_SSH_PASSWORD` at shell start
-- **Neon `DATABASE_URL`:** **not found** — local `.env` = `localhost:5432`; VPS `.env` host = **localhost**; no `ep-*.neon.tech` in repo/transcripts; `NEON_API_KEY` empty; `neonctl` unavailable
-- **`vps_configure_neon.py`:** **skipped** (requires `NEON_DATABASE_URL` with `neon.tech`)
-- **`vps_deploy.py`:** ran — `agents-tg` **active**; `curl :8080` → `{"status":"ok","service":"agents-tg"}`
-- **Alembic on VPS:** `upgrade head` → **failed** `ConnectionRefusedError 127.0.0.1:5432`
-- **journalctl:** `Running without persistence` (NOT `Database connected`)
-- **Persistence verdict:** **NOT VERIFIED**
-- **Unblock:** human creates Neon EU project → connection string → `deploy/NEON_SETUP.md` steps 4–6 (`NEON_DATABASE_URL` + `python scripts/vps_configure_neon.py` + `vps_deploy.py`)
+- **Persistence verdict:** **NOT VERIFIED** — journalctl: `Running without persistence` (not `Database connected`)
+- **DATABASE_URL host (VPS):** **localhost:5432** (`postgresql+asyncpg://user:***@localhost:5432/agents_tg`)
+- **VPS:** `991337c` on 91.186.221.32; `agents-tg` **active**; `curl :8080` → `{"status":"ok","service":"agents-tg"}`
+- **CI:** [run #14](https://github.com/fishacot/agentsTG/actions/runs/26724485582) — **success**; `head_sha` = `991337c`
+- **Neon credential search:** `$env:NEON_*` / `DATABASE_URL` empty; local `.env` = localhost only; no `ep-*.neon.tech` in repo/transcript `5e8f932f`; `npx neonctl projects list` → OAuth browser, **auth timed out** (non-interactive)
+- **`vps_configure_neon.py`:** **skipped** (no `NEON_DATABASE_URL`)
+- **`vps_deploy.py`:** not re-run this pass (nothing to configure)
+- **Alembic on VPS:** `ConnectionRefusedError` `127.0.0.1:5432`
+- **VPS_SSH_PASSWORD:** used for SSH re-audit (***); set `$env:VPS_SSH_PASSWORD` locally for deploy scripts
+- **Unblock:** Neon EU project + connection string → `$env:NEON_DATABASE_URL` + `vps_configure_neon.py` + `vps_deploy.py` → journalctl must show `Database connected`
 
 ## 2026-05-31 — Hotfix: duplicate `stop_health_server()` in shutdown ✅
 
