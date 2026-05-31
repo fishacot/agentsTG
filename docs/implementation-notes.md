@@ -6,10 +6,17 @@
 
 ---
 
+## 2026-05-31 — Hotfix: duplicate `stop_health_server()` in shutdown ✅
+
+- **Файл:** `src/main.py` — в `on_shutdown()` удалён второй подряд `await stop_health_server()` (copy-paste)
+- **Поведение:** `stop_health_server()` идемпотентен (`_server_task` → `None` после первого вызова), но дубликат был лишним
+- **Verify:** `python -m pytest tests/ -v --tb=short` — **84 passed** (~124s)
+
 ## 2026-05-31 — CI green + VPS deploy hardening (full plan) ✅
 
 - **Commit:** `e9b5659` — `fix(ci): green pytest, alembic path, HEARTBEAT deploy`
 - **Push:** `e5049f0..e9b5659` → `origin/master`
+- **CI:** [run #12](https://github.com/fishacot/agentsTG/actions/runs/26713449488) — **success** (Lint + Test + Alembic)
 - **Файлы:** `.github/workflows/test.yml`, `alembic.ini`, `env.py`, `deploy/HEARTBEAT.default.md`, `workspace_memory.py`, `scripts/vps_deploy.py`
 - **CI fix:** `poetry install --only main,dev` вместо ручного pip (duckduckgo-search, trafilatura, greenlet и др.)
 - **Alembic fix:** `env.py` → `parents[4]` (repo root); `prepend_sys_path = .`; импорт `UserTask`, `UserContact`

@@ -12,11 +12,20 @@ Neon — бесплатная облачная PostgreSQL. Нужна для:
 1. Откройте [https://neon.tech](https://neon.tech) → Sign up (GitHub/Google).
 2. **New Project** → регион ближе к VPS (EU).
 3. Скопируйте **Connection string** (формат `postgresql://user:pass@host/db?sslmode=require`).
-4. На VPS в `/opt/agentsTG/.env`:
+4. На VPS в `/opt/agentsTG/.env` (приложение нормализует `postgresql://` → `postgresql+asyncpg://`):
 
 ```bash
-DATABASE_URL=postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require
+DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@ep-xxx.eu-central-1.aws.neon.tech/neondb?sslmode=require
 APP_TIMEZONE=Europe/Moscow
+```
+
+**С Windows (после `git push`):** не коммитить URL в git.
+
+```powershell
+$env:VPS_SSH_PASSWORD = '...'   # root@91.186.221.32
+$env:NEON_DATABASE_URL = 'postgresql+asyncpg://...@....neon.tech/...?sslmode=require'
+python scripts/vps_configure_neon.py
+python scripts/vps_deploy.py
 ```
 
 5. Перезапуск:

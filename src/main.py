@@ -119,7 +119,6 @@ async def on_shutdown():
     await agent_wake_service.stop()
     await reminder_service.stop()
     await stop_health_server()
-    await stop_health_server()
 
     # Stop all bots
     manager = get_bot_manager()

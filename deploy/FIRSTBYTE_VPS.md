@@ -39,6 +39,8 @@ $env:VPS_SSH_PASSWORD='...'   # не коммитить
 python scripts/vps_deploy.py
 ```
 
+**Neon Postgres (persistence):** [`NEON_SETUP.md`](NEON_SETUP.md) — `NEON_DATABASE_URL` + `python scripts/vps_configure_neon.py`, затем `vps_deploy.py`.
+
 ## Telegram acceptance (agent autonomy)
 
 See [`docs/E2E_AUTONOMY.md`](../docs/E2E_AUTONOMY.md).

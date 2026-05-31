@@ -55,9 +55,6 @@ coverage.xml
 .docker/
 *.pid
 
-# Poetry
-poetry.lock
-
 # Mypy
 .mypy_cache/
 .dmypy.json
