@@ -12,7 +12,12 @@
 - **Fix:** `normalize_database_url()` strips `channel_binding`, `sslmode`, `sslrootcert`, `sslcert`, `sslkey`; `create_engine()` adds `connect_args={"ssl": True}` for Neon hosts.
 - **Files:** `src/agents_tg/config/settings.py`, `src/agents_tg/db/session.py`, `tests/test_settings.py` (`TestNormalizeDatabaseUrl`, 4 cases).
 - **Verify:** `pytest tests/test_settings.py` — **10 passed**; poetry CLI not on Windows PATH — **poetry.lock not updated**.
-- **Git/deploy:** commit `fix: strip libpq ssl params for asyncpg Neon` → push `origin/master` → `vps_deploy.py` (see deploy result below).
+- **Commit:** `9d138d0` — `fix: strip libpq ssl params for asyncpg Neon`
+- **Push:** `origin/master` `e71881e..9d138d0` ✅
+- **Deploy VPS (91.186.221.32):** `git reset` → `9d138d0`; **alembic upgrade head** ✅ (initial → `f8a1c3d5e927` gateway/manus tables); `agents-tg` **active**
+- **Health:** `curl :8080` → `{"status":"ok","service":"agents-tg","database":{"status":"ok"}}`
+- **Journal:** `Database connected and tables ensured` (startup)
+- **Minor:** VPS `poetry install` warns lock stale vs pyproject — non-blocking (venv already installed)
 
 ## 2026-06-01 — Ship: full OpenClaw/Manus parity (e71881e) 🚢 push OK, deploy blocked
 
