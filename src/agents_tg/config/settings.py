@@ -19,8 +19,9 @@ def normalize_database_url(url: str) -> str:
         return url
 
     qs = parse_qs(parsed.query, keep_blank_values=True)
-    # Neon may append channel_binding=require — asyncpg rejects this kwarg.
-    qs.pop("channel_binding", None)
+    # Neon/libpq query params that asyncpg rejects as connect() kwargs.
+    for _key in ("channel_binding", "sslmode", "sslrootcert", "sslcert", "sslkey"):
+        qs.pop(_key, None)
     new_query = urlencode(qs, doseq=True)
     return urlunparse(parsed._replace(query=new_query))
 

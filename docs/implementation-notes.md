@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-06-01 — Neon asyncpg: strip libpq ssl params + VPS deploy
+
+- **Problem:** Alembic/app on VPS failed — asyncpg `connect()` got unexpected kwargs `channel_binding`, `sslmode` from Neon `DATABASE_URL` query string.
+- **Fix:** `normalize_database_url()` strips `channel_binding`, `sslmode`, `sslrootcert`, `sslcert`, `sslkey`; `create_engine()` adds `connect_args={"ssl": True}` for Neon hosts.
+- **Files:** `src/agents_tg/config/settings.py`, `src/agents_tg/db/session.py`, `tests/test_settings.py` (`TestNormalizeDatabaseUrl`, 4 cases).
+- **Verify:** `pytest tests/test_settings.py` — **10 passed**; poetry CLI not on Windows PATH — **poetry.lock not updated**.
+- **Git/deploy:** commit `fix: strip libpq ssl params for asyncpg Neon` → push `origin/master` → `vps_deploy.py` (see deploy result below).
+
+## 2026-06-01 — Ship: full OpenClaw/Manus parity (e71881e) 🚢 push OK, deploy blocked
+
+- **Commit:** `e71881e` — feat: full OpenClaw + Manus parity (47 files, +3062 lines)
+- **Verify pre-ship:** pytest — **107 passed**
+- **Push:** `origin/master` `ffa581b..e71881e` ✅
+- **Deploy:** **BLOCKED** — `VPS_SSH_PASSWORD` not in shell or `.env`
+- **Unblock:** set `VPS_SSH_PASSWORD`, then `python scripts/vps_deploy.py`; optional Neon via `vps_configure_neon.py`; migration `f8a1c3d5e927` on VPS
+
 ## 2026-06-01 — Full OpenClaw + Manus parity (Phases 0–13) ✅ verify
 
 - **Phase 0 — Ops:** `health_server.py` — PG ping in JSON (`database.status`); `POST /v1/agent/run`, `POST /v1/webhook/a2a/callback`; VPS deploy needs local credentials (`VPS_SSH_PASSWORD`, Neon `DATABASE_URL`).

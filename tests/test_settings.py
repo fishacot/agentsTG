@@ -2,7 +2,40 @@
 
 import pytest
 
-from src.agents_tg.config.settings import AppSettings
+from src.agents_tg.config.settings import AppSettings, normalize_database_url
+
+
+class TestNormalizeDatabaseUrl:
+    """Strip libpq params and convert driver for asyncpg."""
+
+    def test_postgres_scheme_to_asyncpg(self):
+        url = "postgres://user:pass@ep-test.neon.tech/neondb"
+        assert normalize_database_url(url) == (
+            "postgresql+asyncpg://user:pass@ep-test.neon.tech/neondb"
+        )
+
+    def test_postgresql_scheme_to_asyncpg(self):
+        url = "postgresql://user:pass@localhost:5432/agents_tg"
+        assert normalize_database_url(url) == (
+            "postgresql+asyncpg://user:pass@localhost:5432/agents_tg"
+        )
+
+    def test_strips_libpq_ssl_and_channel_binding(self):
+        url = (
+            "postgresql://user:pass@ep-long-dawn.neon.tech/neondb"
+            "?sslmode=require&channel_binding=require&sslrootcert=/tmp/ca.pem"
+        )
+        out = normalize_database_url(url)
+        assert out.startswith("postgresql+asyncpg://")
+        assert "sslmode" not in out
+        assert "channel_binding" not in out
+        assert "sslrootcert" not in out
+
+    def test_preserves_unrelated_query_params(self):
+        url = "postgresql://u:p@host/db?sslmode=require&application_name=agents"
+        out = normalize_database_url(url)
+        assert "application_name=agents" in out
+        assert "sslmode" not in out
 
 
 class TestAppSettings:
