@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Awaitable
 
 from src.agents_tg.config.settings import get_settings
@@ -20,6 +20,7 @@ MORNING_DIGEST_TEXT = (
 
 SendFn = Callable[[int, int, str, str], Awaitable[None]]
 DigestFn = Callable[[int, int], Awaitable[None]]
+CronDeliverFn = Callable[[int, int, str, str], Awaitable[None]]
 
 
 @dataclass
@@ -30,6 +31,7 @@ class _MemoryReminder:
     agent_key: str
     text: str
     fire_at: datetime
+    recurrence: str = "once"
     status: str = "pending"
 
 
@@ -42,6 +44,7 @@ class ReminderService:
         self._scheduler: Any | None = None
         self._send_fn: SendFn | None = None
         self._digest_fn: DigestFn | None = None
+        self._cron_deliver_fn: CronDeliverFn | None = None
         self._pg_engine: Any | None = None
         self._poll_task: asyncio.Task | None = None
 
@@ -54,6 +57,9 @@ class ReminderService:
     def set_digest_fn(self, fn: DigestFn) -> None:
         self._digest_fn = fn
 
+    def set_cron_deliver_fn(self, fn: CronDeliverFn) -> None:
+        self._cron_deliver_fn = fn
+
     async def schedule(
         self,
         *,
@@ -63,11 +69,16 @@ class ReminderService:
         fire_at_local: datetime,
         agent_key: str = "personal_assistant",
         is_digest: bool = False,
+        recurrence: str = "once",
     ) -> dict[str, Any]:
         if is_digest:
             text = MORNING_DIGEST_MARKER + text
+            recurrence = "daily"
         fire_at_utc = local_to_utc(fire_at_local)
         tz_name = get_settings().APP_TIMEZONE
+        recurrence = (recurrence or "once").lower()
+        if recurrence not in ("once", "daily"):
+            recurrence = "once"
 
         if self._pg_engine:
             rid = await self._insert_pg(
@@ -77,6 +88,7 @@ class ReminderService:
                 fire_at=fire_at_utc,
                 agent_key=agent_key,
                 tz_name=tz_name,
+                recurrence=recurrence,
             )
         else:
             rid = self._next_id
@@ -89,6 +101,7 @@ class ReminderService:
                     agent_key=agent_key,
                     text=text,
                     fire_at=fire_at_utc,
+                    recurrence=recurrence,
                 )
             )
 
@@ -103,6 +116,7 @@ class ReminderService:
             "id": rid,
             "fire_at_local": format_local(fire_at_local),
             "text": text,
+            "recurrence": recurrence,
         }
 
     async def _insert_pg(
@@ -114,6 +128,7 @@ class ReminderService:
         fire_at: datetime,
         agent_key: str,
         tz_name: str,
+        recurrence: str = "once",
     ) -> int:
         from sqlalchemy import insert
 
@@ -128,6 +143,7 @@ class ReminderService:
                     text=text,
                     fire_at=fire_at,
                     timezone_name=tz_name,
+                    recurrence=recurrence,
                     status="pending",
                 ).returning(Reminder.id)
             )
@@ -201,10 +217,18 @@ class ReminderService:
         else:
             for r in list(self._memory):
                 if r.status == "pending" and r.fire_at <= now:
-                    r.status = "sent"
                     await self._deliver(
-                        r.chat_id, r.telegram_user_id, r.text, r.agent_key
+                        r.chat_id,
+                        r.telegram_user_id,
+                        r.text,
+                        r.agent_key,
+                        recurrence=r.recurrence,
+                        reminder_id=r.id,
                     )
+                    if r.recurrence == "daily":
+                        r.fire_at = r.fire_at + timedelta(days=1)
+                    else:
+                        r.status = "sent"
 
     async def _fire_due_pg(self, now: datetime) -> None:
         from sqlalchemy import select, update
@@ -220,11 +244,27 @@ class ReminderService:
             )
             due = list(rows.scalars().all())
             for r in due:
-                await conn.execute(
-                    update(Reminder).where(Reminder.id == r.id).values(status="sent")
-                )
+                recurrence = getattr(r, "recurrence", "once") or "once"
+                if recurrence == "daily":
+                    from datetime import timedelta as _td
+
+                    next_fire = r.fire_at + _td(days=1)
+                    await conn.execute(
+                        update(Reminder)
+                        .where(Reminder.id == r.id)
+                        .values(fire_at=next_fire, status="pending")
+                    )
+                else:
+                    await conn.execute(
+                        update(Reminder).where(Reminder.id == r.id).values(status="sent")
+                    )
                 await self._deliver(
-                    r.chat_id, r.telegram_user_id, r.text, r.agent_key
+                    r.chat_id,
+                    r.telegram_user_id,
+                    r.text,
+                    r.agent_key,
+                    recurrence=recurrence,
+                    reminder_id=r.id,
                 )
 
     async def _deliver(
@@ -233,6 +273,9 @@ class ReminderService:
         user_id: int,
         text: str,
         agent_key: str,
+        *,
+        recurrence: str = "once",
+        reminder_id: int | None = None,
     ) -> None:
         is_digest = text.startswith(MORNING_DIGEST_MARKER)
         display = text[len(MORNING_DIGEST_MARKER) :] if is_digest else text
@@ -242,18 +285,33 @@ class ReminderService:
                 await self._digest_fn(chat_id, user_id)
             except Exception as exc:
                 logger.error("Digest delivery failed: %s", exc)
+        elif self._cron_deliver_fn:
+            try:
+                await self._cron_deliver_fn(chat_id, user_id, display, agent_key)
+            except Exception as exc:
+                logger.error("Cron LLM delivery failed, static fallback: %s", exc)
+                await self._deliver_static(chat_id, user_id, display, agent_key)
         else:
-            body = f"⏰ <b>Напоминание</b>\n{display}"
-            if self._send_fn:
-                try:
-                    await self._send_fn(chat_id, user_id, body, agent_key)
-                except Exception as exc:
-                    logger.error("Reminder delivery failed: %s", exc)
-            else:
-                logger.warning("No send_fn for reminder to chat %s", chat_id)
+            await self._deliver_static(chat_id, user_id, display, agent_key)
 
         if is_digest:
             await self.schedule_morning_digest_if_missing(chat_id, user_id)
+
+    async def _deliver_static(
+        self,
+        chat_id: int,
+        user_id: int,
+        display: str,
+        agent_key: str,
+    ) -> None:
+        body = f"⏰ <b>Напоминание</b>\n{display}"
+        if self._send_fn:
+            try:
+                await self._send_fn(chat_id, user_id, body, agent_key)
+            except Exception as exc:
+                logger.error("Reminder delivery failed: %s", exc)
+        else:
+            logger.warning("No send_fn for reminder to chat %s", chat_id)
 
     async def _register_morning_digest(self) -> None:
         """Reload pending digest reminders from PG on startup (no-op for memory)."""

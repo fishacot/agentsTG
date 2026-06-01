@@ -8,7 +8,7 @@ import asyncio
 import logging
 import signal
 import sys
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from src.agents_tg.bots import create_bot_manager_from_settings, get_bot_manager
 from src.agents_tg.bots.group_coordinator import get_coordinator
@@ -78,19 +78,36 @@ async def on_startup():
     from src.agents_tg.services.agent_wake import agent_wake_service
     from src.agents_tg.services.reminder_service import reminder_service
 
-    pa_bot = manager.get_bot("personal_assistant")
-    if pa_bot:
+    process_fns: dict[str, Any] = {}
+    for agent_key, bot in manager.bots.items():
 
-        async def _pa_scheduled_process(message, user_text, is_group, coordinator):
-            return await pa_bot._process_request(
-                message, user_text, is_group, coordinator
-            )
+        def _make_scheduled_process(b=bot):
+            async def _scheduled(message, user_text, is_group, coordinator):
+                return await b._process_request(
+                    message, user_text, is_group, coordinator
+                )
 
-        agent_wake_service.set_process_fn(_pa_scheduled_process)
+            return _scheduled
+
+        process_fns[agent_key] = _make_scheduled_process()
+
+    if process_fns:
+        agent_wake_service.set_process_fns(process_fns)
+    else:
+        pa_bot = manager.get_bot("personal_assistant")
+        if pa_bot:
+
+            async def _pa_scheduled_process(message, user_text, is_group, coordinator):
+                return await pa_bot._process_request(
+                    message, user_text, is_group, coordinator
+                )
+
+            agent_wake_service.set_process_fn(_pa_scheduled_process)
 
     agent_wake_service.set_send_fn(_wake_send)
     reminder_service.set_send_fn(_reminder_send)
     reminder_service.set_digest_fn(agent_wake_service.run_morning_digest)
+    reminder_service.set_cron_deliver_fn(agent_wake_service.run_scheduled_reminder)
     await reminder_service.start()
     await agent_wake_service.start()
 

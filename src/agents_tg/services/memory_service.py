@@ -80,6 +80,7 @@ class MemoryService:
             event="memory_add",
             payload={"text": text},
         )
+        await self._sync_memory_md(user_id)
 
     async def search(
         self, query: str, user_id: str, limit: int = 5
@@ -153,6 +154,32 @@ class MemoryService:
             "payload": payload or {},
         }
         self._journal_store.setdefault(key, []).append(entry)
+        if user_id.isdigit():
+            from src.agents_tg.services.workspace_memory import append_journal_md
+
+            append_journal_md(
+                int(user_id),
+                agent_key=agent or "orchestrator",
+                event=event,
+                payload=payload,
+            )
+
+    async def _sync_memory_md(self, user_id: str) -> None:
+        if not user_id.isdigit():
+            return
+        from src.agents_tg.services.workspace_memory import refresh_memory_md
+
+        facts = [f.get("text", "") for f in await self.get_all(user_id) if f.get("text")]
+        project_title = None
+        try:
+            from src.agents_tg.services.shared_context import shared_context
+
+            project = await shared_context.get_active_project(int(user_id))
+            if project:
+                project_title = project.get("title")
+        except Exception:
+            pass
+        refresh_memory_md(int(user_id), project_title=project_title, facts=facts)
 
     async def get_journal(
         self, user_id: str, agent: Optional[str]

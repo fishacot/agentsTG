@@ -247,7 +247,7 @@ class UserContact(Base):
 
 
 class Reminder(Base):
-    """Scheduled one-shot reminder delivered via Telegram."""
+    """Scheduled reminder delivered via Telegram (one-shot or recurring)."""
 
     __tablename__ = "reminders"
 
@@ -258,6 +258,7 @@ class Reminder(Base):
     text: Mapped[str] = mapped_column(Text)
     fire_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     timezone_name: Mapped[str] = mapped_column(String(64), default="Europe/Moscow")
+    recurrence: Mapped[str] = mapped_column(String(16), default="once")
     status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

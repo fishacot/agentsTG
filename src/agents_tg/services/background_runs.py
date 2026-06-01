@@ -41,9 +41,10 @@ class BackgroundRunManager:
         user_text: str,
         process_fn: ProcessFn,
         deliver_fn: DeliverFn,
+        agent_key: str = "research",
         ack_text: str = "🔎 Ищу информацию, пришлю результат отдельным сообщением…",
     ) -> str:
-        """Return immediate ack; deliver final via deliver_fn."""
+        """Return immediate ack; deliver final via event wake + runtime tracking."""
 
         async def _work() -> None:
             result = await process_fn(
@@ -52,7 +53,22 @@ class BackgroundRunManager:
                 is_group=False,
                 coordinator=None,
             )
-            if result:
+            if not result:
+                return
+            from_user = getattr(message, "from_user", None)
+            if from_user:
+                from src.agents_tg.services.agent_wake import agent_wake_service
+                from src.agents_tg.services.agent_runtime import TriggerKind
+
+                await agent_wake_service.run_event_wake(
+                    agent_key=agent_key,
+                    telegram_user_id=from_user.id,
+                    chat_id=message.chat.id,
+                    prompt="",
+                    trigger=TriggerKind.BACKGROUND,
+                    precomputed=result,
+                )
+            else:
                 await deliver_fn(message, result)
 
         self.spawn(name="research", coro_factory=_work)

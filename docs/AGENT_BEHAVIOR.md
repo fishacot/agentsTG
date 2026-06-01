@@ -16,10 +16,12 @@
 
 | Уровень | Где | Что хранит |
 |---------|-----|------------|
-| **Личная (user_id)** | `memory_service` | Факты о пользователе через `remember_about_user` |
-| **Mem0 (облако)** | если `MEM0_API_KEY` | То же, семантический поиск |
+| **Личная (user_id)** | `memory_service` + PG `user_facts` | Факты через `remember_about_user` |
+| **Mem0 (облако)** | если `MEM0_API_KEY` | Семантический поиск |
 | **Fallback (VPS)** | in-process `_facts_store` | Последние ~100 фактов на user_id |
-| **Журнал** | `_journal_store` | Служебные события (Manus-style), не для диалога |
+| **Журнал** | `_journal_store` + `workspace/.../JOURNAL.md` | Manus-style события |
+| **История чата** | `chat_history` + PG | Последние turns per agent |
+| **Workspace** | `workspace/users/{id}/` | USER.md, MEMORY.md, daily logs, HEARTBEAT.md |
 
 Все агенты видят **одну память пользователя** (по `user_id` из Telegram).  
 Агенты **не** делят отдельные «личные» базы — только общий контекст на человека.
@@ -45,9 +47,10 @@
 
 ## Ограничения (пока)
 
-- **Нет истории чата** в runner — каждое сообщение почти с нуля (кроме памяти-фактов).
-- **Mem0 на VPS** без ключа — только локальный fallback (пропадает при restart).
+- **Mem0 на VPS** без ключа — локальный fallback + PG facts (если Neon подключён).
 - **Obsidian** — нужен vault + git на сервере, иначе заметки только локально в папке.
+- **Calendar tool** — не реализован (backlog).
+- **Proactive opt-out** per user — только глобальный `HEARTBEAT_ENABLED`.
 
 ## Связанные файлы
 

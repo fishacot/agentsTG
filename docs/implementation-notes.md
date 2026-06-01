@@ -6,7 +6,50 @@
 
 ---
 
-## 2026-06-01 — Alembic loads VPS `.env` + Neon ship cycle 🚧
+## 2026-06-01 — OpenClaw/Manus parity plan (Phases 0–4) ✅ verify
+
+- **Phase 1 — Cron → AgentRun:** `run_scheduled_reminder` + `REMINDER_LLM_DELIVERY`; `reminder_service.set_cron_deliver_fn`.
+- **Phase 2 — Event wake + policy:** `proactive_policy.py`; heartbeat PA only, orchestrator project check-in; `run_event_wake(precomputed=)` in `background_runs`, `orchestrator_delegate`; `record_outbound` on inbound DM.
+- **Phase 3 — Memory + Manus:** `append_journal_md`, `refresh_memory_md` on facts/projects; `confirmation_service` + `REQUIRE_CONFIRM` gate on `update_project_status:done`.
+- **Phase 4 — Docs:** `AGENT_RUNTIME.md`, `AGENT_BEHAVIOR.md`, `OPENCLAW_PARITY.md` — honest done/partial/backlog.
+- **Verify:** `python -m pytest tests/ -v --tb=short` — **97 passed** (~25s).
+- **Файлы (new):** `proactive_policy.py`, `confirmation_service.py`, tests `test_proactive_policy.py`, `test_confirmation_service.py`.
+- **Deploy:** commit → push → `vps_deploy.py` + Neon configure (Phase 0 ops).
+
+## 2026-06-01 — Multi-agent wake + proactive_intent (runtime) ✅ verify
+
+- **Цель:** автономность не только промптами — фоновые пробуждения и materialize расписания до ответа LLM.
+- **`agent_wake.py`:** `set_process_fns(dict)` — heartbeat по **каждому** `agent_key` с отдельным `process_fn`; `_run_and_deliver(..., process_fn=)`.
+- **`main.py`:** при старте регистрирует `_process_request` **всех** 7 ботов в `AgentWakeService` (не только Эльза).
+- **`proactive_intent.py` (new):** regex «каждый день в 11», «напомни через …», autonomy cues → `reminder_service.schedule()` **до** LLM; `build_scheduled_context()` в hints.
+- **`personal_assistant.py`:** `try_schedule_from_message` в `process()`; tool `schedule_reminder` + `recurrence=daily`.
+- **`prompt_builder.py`:** напоминания/автономность → FULL tier + `schedule_reminder` в allowed tools.
+- **Напоминания:** `reminder_service` + `models.recurrence` + миграция `e7a9b2c4d816`; `settings.normalize_database_url()` strip `channel_binding`.
+- **Prompt/SOUL:** `agent_prompts.py`, `personal_assistant.md`, `agent_identity.py` (вспомогательно).
+- **Тесты (new):** `tests/test_proactive_intent.py`, `tests/test_reminder_recurrence.py`.
+- **Verify (hook, последний):** `python -m pytest tests/ -v --tb=short` — **88 passed** in 25.65s (2026-06-01); файлы hook без изменений с прошлого прогона.
+- **Deploy:** локально uncommitted; VPS нужен push + `vps_deploy.py` + `alembic upgrade head`.
+- **TODO:** E2E «каждый день в 11:00» на VPS с Neon; wake только для агентов с `user_contacts` inbound.
+
+## 2026-06-01 — VPS deploy (user request) ✅
+
+- **Trigger:** user asked «сделай деплой на впс»; `master` clean, synced with `origin/master`.
+- **VPS (91.186.221.32):** `git reset --hard origin/master` → **`31486d7`** (was `79f05f9`); `deploy/HEARTBEAT.default.md OK`; `workspace/HEARTBEAT.default.md OK`.
+- **Service:** `agents-tg` **active**; `curl :8080` → `{"status":"ok","service":"agents-tg"}`; all 7 bots registered in journalctl.
+- **Alembic:** was failing with `channel_binding` — **fixed in code** via `settings.normalize_database_url()`; re-deploy + migrate to apply on VPS.
+
+## 2026-05-31 — Autonomous agent runtime (behavior, not prompt-only) 🚧
+
+- **Problem:** Эльза отвечала «не могу писать автономно» — LLM без tools, хотя на VPS уже есть `ReminderService` + `AgentWakeService`.
+- **Root cause:** capability-вопросы шли в LIGHT tier (0 tools); `recurrence=daily` был в промптах, но не в коде; wake только у `personal_assistant`.
+- **Fix (code):**
+  - `proactive_intent.py` — до ответа LLM материализует «каждый день в 11 МСK» → `reminder_service.schedule(recurrence=daily)`.
+  - `reminder_service` + alembic `e7a9b2c4d816` — поле `recurrence` (`once`|`daily`), после fire daily перепланируется.
+  - `prompt_builder` — напоминания/автономность → FULL tier + `schedule_reminder` в STANDARD.
+  - `agent_wake` + `main.py` — heartbeat/process_fn для **всех** зарегистрированных ботов.
+- **Verify (2026-05-31, hook):** `python -m pytest tests/ -v --tb=short` — **88 passed** in 25.71s.
+- **Файлы:** `personal_assistant.py`, `personal_assistant.md`, `settings.py`, `models.py`, `agent_identity.py`, `agent_prompts.py`, `agent_wake.py`, `prompt_builder.py`, `proactive_intent.py`, `reminder_service.py`, `main.py`, `e7a9b2c4d816` migration, tests.
+- **Deploy:** commit → push → `vps_deploy.py` → `alembic upgrade head` на VPS (миграция recurrence).
 
 - **Root cause:** `env.py` used `alembic.ini` default `localhost:5432`; VPS `.env` had Neon `DATABASE_URL` but migrations ignored it → `ConnectionRefusedError`.
 - **Fix:** `src/agents_tg/db/migrations/env.py` — `get_settings().async_database_url` → `config.set_main_option("sqlalchemy.url", …)` before online/offline runs.

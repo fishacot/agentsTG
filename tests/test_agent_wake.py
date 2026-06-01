@@ -118,3 +118,51 @@ def test_load_heartbeat_default():
 
     text = load_heartbeat_md(999999)
     assert "HEARTBEAT_OK" in text
+
+
+@pytest.mark.asyncio
+async def test_run_scheduled_reminder_llm_delivery():
+    wake = AgentWakeService()
+    send = AsyncMock()
+    wake.set_send_fn(send)
+    wake.set_process_fn(AsyncMock(return_value="Доброе утро! Напомню про встречу."))
+
+    with patch(
+        "src.agents_tg.services.agent_wake.get_settings"
+    ) as mock_settings:
+        mock_settings.return_value.REMINDER_LLM_DELIVERY = True
+        await wake.run_scheduled_reminder(
+            chat_id=10,
+            telegram_user_id=1,
+            text="встреча",
+            agent_key="personal_assistant",
+        )
+
+    send.assert_called_once()
+    assert "⏰" in send.call_args[0][2]
+
+
+@pytest.mark.asyncio
+async def test_run_event_wake_precomputed():
+    wake = AgentWakeService()
+    send = AsyncMock()
+    wake.set_send_fn(send)
+
+    with patch(
+        "src.agents_tg.services.agent_wake.user_contact_service.record_outbound",
+        new=AsyncMock(),
+    ), patch(
+        "src.agents_tg.services.memory_service.memory_service.add_journal_entry",
+        new=AsyncMock(),
+    ):
+        await wake.run_event_wake(
+            agent_key="research",
+            telegram_user_id=1,
+            chat_id=10,
+            prompt="",
+            precomputed="Итог исследования: Python 3.13",
+        )
+
+    send.assert_called_once()
+    assert "Python" in send.call_args[0][2]
+

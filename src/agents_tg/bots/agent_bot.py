@@ -312,6 +312,16 @@ class AgentBot:
                     parts=1 + len(run_result.extras),
                 )
 
+                if not is_group and message.from_user and (run_result.messages or sent):
+                    from src.agents_tg.services.user_contact_service import (
+                        user_contact_service,
+                    )
+
+                    await user_contact_service.record_outbound(
+                        telegram_user_id=message.from_user.id,
+                        agent_key=self.agent_key,
+                    )
+
                 await self._auto_log_project_activity(message, primary)
 
             except Exception as e:

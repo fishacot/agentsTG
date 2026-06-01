@@ -53,6 +53,8 @@ _ACTION_PATTERN = re.compile(
     r"|добавь задач|список дел|list tasks|покажи\s+(?:мои\s+)?дела"
     r"|запомни что|remember"
     r"|deep_research|заметк"
+    r"|напомни|напомин|пингни|пингани|каждый\s+день|ежедневн"
+    r"|автономн|24\s*/\s*7|по\s+расписан"
     r")"
 )
 
@@ -228,6 +230,11 @@ def tools_for_tier(
         }
         if not include_web_tools and _TASK_LIST_PATTERN.search(user_message or ""):
             allowed.add("list_tasks")
+        if not include_web_tools and re.search(
+            r"(?i)напомни|напомин|пинг|каждый\s+день|ежедневн|автоном",
+            user_message or "",
+        ):
+            allowed.add("schedule_reminder")
         return [t for t in tool_list if t.name in allowed]
     if include_web_tools:
         allowed = {"remember_about_user"}

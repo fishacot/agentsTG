@@ -6,12 +6,23 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 def normalize_database_url(url: str) -> str:
-    """Convert Render/Heroku postgres URL to async SQLAlchemy driver."""
+    """Convert Render/Heroku/Neon postgres URL to async SQLAlchemy driver."""
+    from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
     if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+asyncpg://", 1)
-    if url.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    return url
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    parsed = urlparse(url)
+    if not parsed.query:
+        return url
+
+    qs = parse_qs(parsed.query, keep_blank_values=True)
+    # Neon may append channel_binding=require — asyncpg rejects this kwarg.
+    qs.pop("channel_binding", None)
+    new_query = urlencode(qs, doseq=True)
+    return urlunparse(parsed._replace(query=new_query))
 
 
 class AppSettings(BaseSettings):
@@ -94,6 +105,12 @@ class AppSettings(BaseSettings):
     HEARTBEAT_QUIET_HOURS: float = 12.0
     HEARTBEAT_SKIP_IF_BUSY_MIN: int = 5
     HEARTBEAT_DIGEST_LLM: bool = True
+
+    # Cron reminders → full AgentRun (LLM delivery); static fallback on failure
+    REMINDER_LLM_DELIVERY: bool = True
+
+    # Manus-style confirmation gates for destructive actions
+    REQUIRE_CONFIRM: bool = False
 
     # Paths
     ROOT_DIR: Path = Path(__file__).resolve().parent.parent.parent.parent

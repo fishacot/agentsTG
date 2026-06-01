@@ -8,6 +8,7 @@ from src.agents_tg.services.agent_runner import AgentTool, tool_result
 from src.agents_tg.services.shared_context import shared_context
 from src.agents_tg.services.workspace_memory import (
     append_daily_log,
+    refresh_memory_md,
     write_user_md,
 )
 
@@ -40,6 +41,7 @@ def update_user_profile_tool() -> AgentTool:
             bio=profile.get("bio"),
             preferences=profile.get("preferences"),
         )
+        refresh_memory_md(uid, facts=None)
         return tool_result(ok=True, profile=profile)
 
     return AgentTool(
@@ -75,6 +77,7 @@ def set_active_project_tool(agent_key: str) -> AgentTool:
             description=str(kwargs.get("description", "") or "") or None,
         )
         append_daily_log(uid, agent_key=agent_key, text=f"Новый проект: {title}")
+        refresh_memory_md(uid, project_title=title)
         return tool_result(ok=True, project=project)
 
     return AgentTool(
@@ -101,11 +104,30 @@ def update_project_status_tool() -> AgentTool:
         status = str(kwargs.get("status", "")).strip()
         if not uid or not status:
             return tool_result(ok=False, error="missing_status")
+        action = f"update_project_status:{status}"
+        from src.agents_tg.services.confirmation_service import confirmation_service
+
+        if confirmation_service.requires_confirmation(action):
+            confirmed = kwargs.get("confirmed") is True
+            if not confirmed:
+                confirmation_service.register(
+                    telegram_user_id=uid,
+                    action=action,
+                    payload={"status": status, "project_id": kwargs.get("project_id")},
+                )
+                return tool_result(
+                    ok=False,
+                    needs_confirmation=True,
+                    action=action,
+                    hint=confirmation_service.hint_for_action(action),
+                )
         result = await shared_context.update_project_status(
             uid,
             project_id=kwargs.get("project_id"),
             status=status,
         )
+        if result.get("ok") and status == "done":
+            refresh_memory_md(uid, project_title=None)
         return tool_result(**result)
 
     return AgentTool(
@@ -142,6 +164,11 @@ def log_project_activity_tool(agent_key: str) -> AgentTool:
         )
         if result.get("ok"):
             append_daily_log(uid, agent_key=agent_key, text=summary)
+            project = await shared_context.get_active_project(uid)
+            refresh_memory_md(
+                uid,
+                project_title=project.get("title") if project else None,
+            )
         return tool_result(**result)
 
     return AgentTool(

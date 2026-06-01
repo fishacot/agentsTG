@@ -64,6 +64,29 @@ def append_daily_log(
         path.write_text(f"# {day}\n\n{line}", encoding="utf-8")
 
 
+def append_journal_md(
+    telegram_user_id: int,
+    *,
+    agent_key: str,
+    event: str,
+    payload: dict | None = None,
+) -> None:
+    root = _workspace_root(telegram_user_id)
+    path = root / "JOURNAL.md"
+    stamp = now_local().strftime("%Y-%m-%d %H:%M")
+    line = f"- [{stamp}] **{agent_key}** / {event}"
+    if payload:
+        summary = str(payload.get("text") or payload.get("summary") or "")[:120]
+        if summary:
+            line += f": {summary}"
+    line += "\n"
+    if path.exists():
+        with path.open("a", encoding="utf-8") as f:
+            f.write(line)
+    else:
+        path.write_text(f"# JOURNAL — Manus log\n\n{line}", encoding="utf-8")
+
+
 def refresh_memory_md(
     telegram_user_id: int,
     *,

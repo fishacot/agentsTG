@@ -151,6 +151,9 @@ class PersonalAssistant:
 
             text = str(kwargs.get("text", "")).strip()
             when_raw = str(kwargs.get("when", "")).strip()
+            recurrence = str(kwargs.get("recurrence", "once")).strip().lower() or "once"
+            if recurrence not in ("once", "daily"):
+                recurrence = "once"
             if not text:
                 return tool_result(ok=False, error="empty_text")
             fire_at = parse_reminder_when(when_raw)
@@ -169,6 +172,7 @@ class PersonalAssistant:
                 chat_id=chat,
                 text=text,
                 fire_at_local=fire_at,
+                recurrence=recurrence,
             )
             return tool_result(**data)
 
@@ -242,8 +246,8 @@ class PersonalAssistant:
                 name="schedule_reminder",
                 description=(
                     "Запланировать напоминание в Telegram на указанное время (МСК). "
-                    "ОБЯЗАТЕЛЬНО при «напомни», «пингни в …». Без этого инструмента "
-                    "не обещай, что напомнишь."
+                    "ОБЯЗАТЕЛЬНО при «напомни», «пингни в …», «каждый день в …». "
+                    "recurrence=daily для ежедневных автономных сообщений."
                 ),
                 parameters={
                     "type": "object",
@@ -252,6 +256,11 @@ class PersonalAssistant:
                         "when": {
                             "type": "string",
                             "description": "Когда: «через 10 минут», «в 11:00», «завтра 9:00»",
+                        },
+                        "recurrence": {
+                            "type": "string",
+                            "enum": ["once", "daily"],
+                            "description": "once — один раз; daily — каждый день в это время",
                         },
                     },
                     "required": ["text", "when"],
@@ -297,6 +306,20 @@ class PersonalAssistant:
 
         hints = MANUS_PA_STYLE
         tier = detect_prompt_tier(message)
+
+        from src.agents_tg.services.proactive_intent import (
+            build_scheduled_context,
+            try_schedule_from_message,
+        )
+
+        if tg_uid and chat_id:
+            scheduled_lines = await try_schedule_from_message(
+                message,
+                telegram_user_id=tg_uid,
+                chat_id=chat_id,
+                agent_key="personal_assistant",
+            )
+            hints += build_scheduled_context(scheduled_lines)
         if (
             tier == PromptTier.LIGHT
             and tg_uid

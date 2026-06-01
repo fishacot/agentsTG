@@ -21,6 +21,7 @@ async def maybe_delegate_async(
     user_text: str,
     process_fn: ProcessFn,
     deliver_fn: DeliverFn,
+    agent_key: str = "orchestrator",
 ) -> str:
     """If plan has 2+ steps, notify user and finish remaining work in background."""
     if len(plan) < 2:
@@ -43,13 +44,39 @@ async def maybe_delegate_async(
                 coordinator=None,
             )
             if final and final.strip() != primary_reply.strip():
-                await deliver_fn(message, final)
+                from_user = getattr(message, "from_user", None)
+                if from_user:
+                    from src.agents_tg.services.agent_runtime import TriggerKind
+                    from src.agents_tg.services.agent_wake import agent_wake_service
+
+                    await agent_wake_service.run_event_wake(
+                        agent_key=agent_key,
+                        telegram_user_id=from_user.id,
+                        chat_id=message.chat.id,
+                        prompt="",
+                        trigger=TriggerKind.DELEGATION,
+                        precomputed=final,
+                    )
+                else:
+                    await deliver_fn(message, final)
         except Exception as exc:
             logger.exception("Orchestrator async delegation failed: %s", exc)
-            await deliver_fn(
-                message,
-                "😕 Не удалось завершить все шаги плана. Попробуйте уточнить запрос.",
-            )
+            err = "😕 Не удалось завершить все шаги плана. Попробуйте уточнить запрос."
+            from_user = getattr(message, "from_user", None)
+            if from_user:
+                from src.agents_tg.services.agent_runtime import TriggerKind
+                from src.agents_tg.services.agent_wake import agent_wake_service
+
+                await agent_wake_service.run_event_wake(
+                    agent_key=agent_key,
+                    telegram_user_id=from_user.id,
+                    chat_id=message.chat.id,
+                    prompt="",
+                    trigger=TriggerKind.DELEGATION,
+                    precomputed=err,
+                )
+            else:
+                await deliver_fn(message, err)
 
     background_runs.spawn(name="orchestrator_delegate", coro_factory=_work)
     return base + suffix
