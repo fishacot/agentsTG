@@ -1,0 +1,5 @@
+id: deep_research
+name: Deep Research Plugin
+version: "1.0"
+tools:
+  - deep_research

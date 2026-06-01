@@ -196,13 +196,14 @@ class AgentRunner:
         environment_block: str = "",
         temperature: float = 0.4,
         max_tokens: int = 900,
+        max_tool_rounds_override: int | None = None,
     ) -> str:
         identity = get_agent_identity(agent_key)
         human_name = identity.get("human_name") or agent_key
         designation = identity.get("designation") or ""
 
         profile = get_delivery_profile(agent_key)
-        max_tool_rounds = profile.max_tool_rounds
+        max_tool_rounds = max_tool_rounds_override or profile.max_tool_rounds
 
         tier = detect_prompt_tier(user_message, include_web_tools=include_web_tools)
         profile_cap = profile.max_tokens
@@ -215,8 +216,10 @@ class AgentRunner:
 
         tool_list = list(tools or [])
         tool_list.append(_remember_tool(agent_key))
+        from src.agents_tg.services.role_tools import role_tools_for
         from src.agents_tg.services.shared_context_tools import shared_context_tools
 
+        tool_list.extend(role_tools_for(agent_key))
         tool_list.extend(shared_context_tools(agent_key=agent_key))
         if get_outbound_sink() is not None:
             tool_list.append(send_telegram_message_tool())
@@ -257,6 +260,17 @@ class AgentRunner:
             user_id=user_id,
             user_message=user_message,
         )
+
+        from src.agents_tg.gateway.hook_registry import hook_registry as _hooks
+
+        system, block_reason = await _hooks.run_before_prompt_build(
+            agent_key=agent_key,
+            user_id=user_id,
+            user_message=user_message,
+            system=system,
+        )
+        if block_reason:
+            return block_reason
 
         active_tools = tools_for_tier(
             tool_list, tier, user_message, include_web_tools=include_web_tools
@@ -314,11 +328,43 @@ class AgentRunner:
                     if not handler:
                         tool_output = tool_result(ok=False, error=f"unknown_tool:{name}")
                     else:
-                        try:
-                            tool_output = await handler(**args)
-                        except Exception as exc:
-                            logger.exception("Tool %s failed", name)
-                            tool_output = tool_result(ok=False, error=str(exc))
+                        allowed, reason = await hook_registry.run_before_tool_call(
+                            agent_key=agent_key,
+                            user_id=user_id,
+                            tool_name=name,
+                            args=args,
+                        )
+                        if not allowed:
+                            tool_output = tool_result(ok=False, error=reason or "denied")
+                        else:
+                            try:
+                                tool_output = await handler(**args)
+                            except Exception as exc:
+                                logger.exception("Tool %s failed", name)
+                                tool_output = tool_result(ok=False, error=str(exc))
+                                await hook_registry.run_after_tool_exec(
+                                    agent_key=agent_key,
+                                    user_id=user_id,
+                                    tool_name=name,
+                                    args=args,
+                                    output="",
+                                    error=str(exc),
+                                )
+                                messages.append(
+                                    {
+                                        "role": "tool",
+                                        "tool_call_id": call.get("id", name),
+                                        "content": tool_output,
+                                    }
+                                )
+                                continue
+                        await hook_registry.run_after_tool_exec(
+                            agent_key=agent_key,
+                            user_id=user_id,
+                            tool_name=name,
+                            args=args,
+                            output=tool_output,
+                        )
 
                     messages.append(
                         {

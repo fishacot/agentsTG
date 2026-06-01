@@ -11,10 +11,10 @@
 | OpenClaw | Документация | agentsTG | Статус |
 |----------|--------------|----------|--------|
 | Block chunking | [streaming](https://docs.openclaw.ai/concepts/streaming) | `telegram_delivery.py` | done |
-| Preview streaming | Telegram editMessageText | — | planned |
+| Preview streaming | Telegram editMessageText | — | backlog |
 | textChunkLimit 4096 | per channel | `split_telegram_html` | done |
 | Coalesce blocks | idleMs merge | — | backlog |
-| humanDelay | 800–2500ms between bubbles | — | backlog |
+| humanDelay | 800–2500ms between bubbles | `HUMAN_DELAY_MS_*` in `telegram_delivery.py` | done |
 | Delivery retry | retry on fail | 2× retry | done |
 
 ## Message pipeline
@@ -22,52 +22,84 @@
 | OpenClaw | agentsTG | Статус |
 |----------|----------|--------|
 | inbound debounce 2s | `message_pipeline.py` | done |
-| dedupe message_id | memory | done |
+| dedupe message_id | gateway + `message_pipeline` | done |
 | queue steer/followup | per-chat queue | done |
 | per-chat sequencing | per-chat lock | done |
+
+## L2 Gateway
+
+| OpenClaw | agentsTG | Статус |
+|----------|----------|--------|
+| OpenClawEnvelope | `gateway/envelope.py` | done |
+| TelegramAdapter | `channels/telegram_adapter.py` | done |
+| Session manager | `gateway/session.py` | done |
+| Task Brain / agent_jobs | `gateway/job_store.py` + PG | done |
+| Idempotency | gateway dispatch + job_store | done |
+| HTTP agent/run | `health_server.py` POST `/v1/agent/run` | done |
+| A2A callback | POST `/v1/webhook/a2a/callback` | done (stub) |
+| WS / OpenAI-compat API | — | backlog |
+
+## Security hooks
+
+| OpenClaw | agentsTG | Статус |
+|----------|----------|--------|
+| before_prompt_build | `hook_registry` + injection_guard | done |
+| before_tool_call | sandbox + deny per agent | done |
+| after_tool_exec | JOURNAL.md audit | done |
 
 ## Time & autonomy
 
 | OpenClaw | agentsTG | Статус |
 |----------|----------|--------|
-| `cron add --at --tz` | `reminder_service` poll + PG | partial (poll, not APScheduler) |
-| agent turn on wake | `AgentRun(trigger=cron)` via `run_scheduled_reminder` | done |
-| heartbeat / proactive | PA heartbeat + orchestrator check-in + digest 09:00 | done |
-| event wake after background | `run_event_wake` | done |
-| proactive policy per agent | `proactive_policy.py` | done |
+| cron / scheduler | `reminder_service` APScheduler + poll | partial |
+| agent turn on wake | `AgentRun(trigger=cron)` | done |
+| heartbeat | PA + orchestrator check-in | done |
+| activeHours / skipWhenBusy | `agent_wake.py` + settings | done |
+| event wake | `run_event_wake` | done |
+| proactive policy | `proactive_policy.py` | done |
+
+## Manus layer
+
+| Manus | agentsTG | Статус |
+|-------|----------|--------|
+| Plan executor | `plan_executor.py` + LangGraph loop | done |
+| Outer loop / max turns | `agent_outer_loop.py` | partial |
+| Progress UX | step messages in delegate | partial |
+| Artifacts sendDocument | `artifact_service.py` | partial |
+| Confirmation TG buttons | `confirmation_service` + callbacks | done |
+| AgentTask FSM PG | `agent_tasks` + `plan_steps` | done |
 
 ## Agent bootstrap
 
 | OpenClaw file | agentsTG | Статус |
 |---------------|----------|--------|
 | SOUL.md | `agents/souls/*.md` | done |
-| AGENTS.md | CursoRules + `agent_prompts.py` | done |
-| IDENTITY.md | `agent_identity.py` | done |
-| USER.md | `user_profiles` + bootstrap USER block | done |
-| MEMORY.md | `workspace/.../MEMORY.md` + `refresh_memory_md` | partial (sync on fact/project) |
-| memory/YYYY-MM-DD.md | `workspace_memory.append_daily_log` | done |
-| JOURNAL.md | `append_journal_md` (Manus log) | done |
-| TOOLS.md | `agents/tools/{agent_key}.md` | done |
-| Shared FOCUS | `user_projects` + `project_activity` | done |
-| Cross-agent journal | auto-log + JOURNAL.md | done |
-| Confirmation gates | `confirmation_service` + `REQUIRE_CONFIRM` | partial (MVP) |
+| per-agent workspace | `workspace/users/{id}/agents/{role}/` | done |
+| JOURNAL.md | `append_journal_md` + `/journal` | done |
+| Confirmation gates | PG + `REQUIRE_CONFIRM` | partial |
+
+## L4 Execution
+
+| OpenClaw | agentsTG | Статус |
+|----------|----------|--------|
+| Plugin registry | `plugins/registry.py` + plugin.yaml | partial |
+| MCP bridge | `mcp/client.py` stub | partial |
+| Sandbox run_code | `sandbox/docker_runner.py` | partial (subprocess, no Docker yet) |
+| Browser tools | httpx fallback in `role_tools` | partial |
 
 ## Multi-agent
 
 | OpenClaw | agentsTG | Статус |
 |----------|----------|--------|
-| NO_REPLY silent | group orchestrator | done |
-| deterministic routing | 7 separate bots | done |
-| delegation | orchestrator LangGraph + async delegate | partial |
-| Gateway envelope layer | direct `agent_bot → runtime` | backlog |
-
-## Groq vs wrapper
-
-OpenClaw abstract provider; мы используем Groq/Gemini chain — 429 и TPM лимиты **дополняют**, но не заменяют дыры в delivery/runtime.
+| 7 separate bots | unchanged | done |
+| Gateway envelope layer | `agent_bot → gateway → dispatch` | done |
+| delegation | PlanExecutor + orchestrator graph | partial |
 
 ## Ops
 
 | Item | Статус |
 |------|--------|
-| Neon PG persistence on VPS | partial — требует `DATABASE_URL` + `alembic upgrade head` |
-| E2E W1–W3 | см. [E2E_AUTONOMY.md](E2E_AUTONOMY.md) |
+| Health + PG ping | `curl :8080/` → `database.status` |
+| Neon PG + migrations | `f8a1c3d5e927` — run `alembic upgrade head` |
+| E2E W1–W10 | см. [E2E_AUTONOMY.md](E2E_AUTONOMY.md) |
+| Node sidecar migration | см. [OPENCLAW_SIDECAR_EVAL.md](OPENCLAW_SIDECAR_EVAL.md) |

@@ -52,10 +52,35 @@ async def on_startup():
         shared_context.set_pg_engine(_db_engine)
         user_tasks_service.set_pg_engine(_db_engine)
         user_contact_service.set_pg_engine(_db_engine)
+
+        from src.agents_tg.gateway import register_default_hooks
+        from src.agents_tg.gateway.job_store import job_store
+        from src.agents_tg.services.confirmation_service import confirmation_service
+        from src.agents_tg.services.health_server import set_db_engine
+        from src.agents_tg.services.plan_executor import plan_executor
+
+        job_store.set_engine(_db_engine)
+        plan_executor.set_engine(_db_engine)
+        confirmation_service.set_pg_engine(_db_engine)
+        set_db_engine(_db_engine)
+        register_default_hooks()
+        recovered = await job_store.recover_stale()
+        if recovered:
+            logger.info("Task Brain recovered %s stale jobs", recovered)
+
+        from src.agents_tg.plugins.role_tools import register_role_tools
+
+        register_role_tools()
         logger.info("✅ Database connected and tables ensured")
     except Exception as e:
         logger.warning(f"⚠️ Database not available: {e}")
         logger.info("   Running without persistence")
+        from src.agents_tg.gateway import register_default_hooks
+
+        register_default_hooks()
+        from src.agents_tg.plugins.role_tools import register_role_tools
+
+        register_role_tools()
 
     manager = get_bot_manager()
 

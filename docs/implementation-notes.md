@@ -6,6 +6,44 @@
 
 ---
 
+## 2026-06-01 — Full OpenClaw + Manus parity (Phases 0–13) ✅ verify
+
+- **Phase 0 — Ops:** `health_server.py` — PG ping in JSON (`database.status`); `POST /v1/agent/run`, `POST /v1/webhook/a2a/callback`; VPS deploy needs local credentials (`VPS_SSH_PASSWORD`, Neon `DATABASE_URL`).
+- **Phase 1 — L1 Envelope:** `gateway/envelope.py`, `channels/telegram_adapter.py`; `agent_bot` → adapter → `gateway_router.dispatch`; `_process_request` → `gateway/agent_dispatch.dispatch_agent_process` (arch test `test_arch_layer_boundaries.py`).
+- **Phase 2 — L2 Gateway:** `gateway/router.py`, `session.py`, `job_store.py`; migration `f8a1c3d5e927` (`agent_jobs`, `agent_tasks`, `plan_steps`, `pending_confirmations`).
+- **Phase 3 — Hooks:** `gateway/hook_registry.py`, `hooks/injection_guard.py`; wired in `agent_runner.py` (before_prompt, before_tool, after_tool).
+- **Phase 4 — Task Brain + Cron:** APScheduler in `reminder_service`; heartbeat `activeHours`/`skipWhenBusy`/`lightContext` in `agent_wake.py`; job recovery on startup in `main.py`.
+- **Phase 5 — PlanExecutor:** `services/plan_executor.py`; orchestrator LangGraph `supervisor → specialist → supervisor` loop; `orchestrator_delegate.py` step iteration.
+- **Phase 6 — AgentOuterLoop:** `services/agent_outer_loop.py` — `MAX_AGENT_TURNS`, checkpoint via `plan_executor.save_checkpoint`.
+- **Phase 7 — Progress UX:** `humanDelay` in `telegram_delivery.py`; `/journal`, `/task`, `/status` in `agent_bot.py`; `artifact_service.py`.
+- **Phase 8 — Confirmations:** PG `pending_confirmations`; TG inline callbacks `confirm:{token}:yes|no`; `REQUIRE_CONFIRM` env.
+- **Phase 9 — Sandbox:** `sandbox/docker_runner.py` (`run_code`/`run_python_code`); `browser_tools.py` httpx fallback; sandbox guard in hooks.
+- **Phase 10 — Plugins + MCP:** `plugins/registry.py`, `plugins/deep_research/plugin.yaml`; `mcp/client.py` stub.
+- **Phase 11 — Workspace isolation:** `workspace/users/{id}/agents/{role}/` in `workspace_memory.py`; `list_agent_workspace` tool.
+- **Phase 12 — Role tools:** `services/role_tools.py` — orchestrator/coder/research/security P0 tools.
+- **Phase 13 — Sidecar eval:** `docs/OPENCLAW_SIDECAR_EVAL.md` (decision gate, no Node code).
+- **Verify:** `python -m pytest tests/ -v --tb=short` — **107 passed** (~286s on Windows).
+- **Deploy:** `alembic upgrade head` for `f8a1c3d5e927`; VPS credentials not in agent shell — run deploy scripts locally.
+
+## 2026-06-01 — Full OpenClaw + Manus parity (Phases 0–13) ✅ verify
+
+- **Phase 0:** `health_server` PG ping; ops checklist (VPS deploy still needs `NEON_DATABASE_URL`).
+- **Phase 1:** `OpenClawEnvelope`, `TelegramAdapter`, `agent_dispatch`; arch test `test_arch_layer_boundaries`.
+- **Phase 2:** `GatewayRouter`, `AgentJobStore`, HTTP `/v1/agent/run`, `/v1/webhook/a2a/callback`; migration `f8a1c3d5e927`.
+- **Phase 3:** `hook_registry` + injection/sandbox/audit hooks wired in `agent_runner`.
+- **Phase 4:** APScheduler in `reminder_service`; heartbeat `activeHours` (30m default, 8–23 MSK).
+- **Phase 5:** `PlanExecutor` + orchestrator supervisor↔specialist loop; `orchestrator_delegate` step progress.
+- **Phase 6:** `AgentOuterLoop` + `MAX_AGENT_TURNS`.
+- **Phase 7:** `humanDelay` in delivery; `/journal`, `/task`, `/status`; `ArtifactService`.
+- **Phase 8:** `confirmation_service` PG + TG inline callbacks.
+- **Phase 9:** `sandbox/docker_runner`, `browser_tools` httpx stub.
+- **Phase 10:** `plugins/registry.py`, `role_tools` plugin, MCP stub.
+- **Phase 11:** `workspace/users/{id}/agents/{role}/` isolation.
+- **Phase 12:** P0 role tools (delegate_task, run_code, browser_*, scan_prompt, …).
+- **Phase 13:** `docs/OPENCLAW_SIDECAR_EVAL.md` — defer Node sidecar.
+- **Verify:** `python -m pytest tests/ -v --tb=short` — **107 passed**.
+- **Docs:** `OPENCLAW_PARITY.md`, `E2E_AUTONOMY.md` W4–W10.
+
 ## 2026-06-01 — OpenClaw/Manus parity plan (Phases 0–4) ✅ verify
 
 - **Phase 1 — Cron → AgentRun:** `run_scheduled_reminder` + `REMINDER_LLM_DELIVERY`; `reminder_service.set_cron_deliver_fn`.

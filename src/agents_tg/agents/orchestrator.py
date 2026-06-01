@@ -103,24 +103,79 @@ class Orchestrator:
             },
         )
 
-        workflow.add_edge("personal_assistant", END)
-        workflow.add_edge("research", END)
-        workflow.add_edge("coder", END)
-        workflow.add_edge("security_ai", END)
-        workflow.add_edge("business_manager", END)
-        workflow.add_edge("marketing", END)
-        workflow.add_edge("general", END)
+        for node in (
+            "personal_assistant",
+            "research",
+            "coder",
+            "security_ai",
+            "business_manager",
+            "marketing",
+            "general",
+        ):
+            workflow.add_conditional_edges(
+                node,
+                self.after_specialist,
+                {"supervisor": "supervisor", "end": END},
+            )
 
         return workflow
 
+    def after_specialist(self, state: AgentState) -> str:
+        """Loop back to supervisor until plan complete or max steps."""
+        plan = state.get("plan") or []
+        step = state.get("current_step", 0)
+        max_steps = max(len(plan), 1) + 2
+        if plan and step < len(plan):
+            return "supervisor"
+        if step >= max_steps:
+            return "end"
+        if plan and step >= len(plan):
+            return "end"
+        return "end"
+
     async def supervisor_node(self, state: AgentState) -> Dict[str, Any]:
         """Node that decides which agent to call next and manages the plan."""
-        last_message = state["messages"][-1].content
+        last_message = state["messages"][-1]
+        last_name = getattr(last_message, "name", None)
+        plan = state.get("plan") or []
+        current_step = state.get("current_step", 0)
+
+        if last_name and last_name not in ("supervisor", None, ""):
+            if plan and current_step < len(plan):
+                next_instruction = plan[current_step]
+                next_agent = self._infer_agent_for_step(next_instruction)
+                return {
+                    "next_agent": next_agent,
+                    "plan": plan,
+                    "direct_reply": "",
+                    "current_step": current_step + 1,
+                    "messages": [
+                        HumanMessage(content=next_instruction, name="supervisor")
+                    ],
+                }
+            if plan and current_step >= len(plan):
+                specialist_text = (
+                    last_message.content
+                    if hasattr(last_message, "content")
+                    else str(last_message)
+                )
+                return {
+                    "next_agent": "end",
+                    "plan": plan,
+                    "direct_reply": str(specialist_text),
+                    "current_step": current_step,
+                }
+
+        user_content = (
+            last_message.content
+            if hasattr(last_message, "content")
+            else str(last_message)
+        )
         user_id = state.get("user_id", "default")
         orchestrator_soul = self._load_soul("orchestrator")
         env_block = trim_env_block(state.get("environment_block", ""), PromptTier.STANDARD)
 
-        memories = await memory_service.search(last_message, user_id=user_id, limit=4)
+        memories = await memory_service.search(user_content, user_id=user_id, limit=4)
         memory_context = ""
         if memories:
             memory_lines = "\n".join([f"- {m['text']}" for m in memories[:4]])
@@ -138,7 +193,7 @@ class Orchestrator:
                     f"{ORCHESTRATOR_ROUTING_PROMPT}"
                 ),
             },
-            {"role": "user", "content": last_message},
+            {"role": "user", "content": user_content},
         ]
 
         if state.get("plan"):
@@ -204,7 +259,27 @@ class Orchestrator:
         """Routing logic based on next_agent state."""
         if state.get("direct_reply") and state.get("next_agent") in ("end", ""):
             return "end"
-        return state["next_agent"]
+        next_agent = state.get("next_agent", "general")
+        if next_agent == "end":
+            return "end"
+        return next_agent
+
+    @staticmethod
+    def _infer_agent_for_step(step_text: str) -> str:
+        low = step_text.lower()
+        if any(w in low for w in ("код", "python", "архитект", "code")):
+            return "coder"
+        if any(w in low for w in ("поиск", "найди", "research", "новост")):
+            return "research"
+        if any(w in low for w in ("безопас", "security")):
+            return "security_ai"
+        if any(w in low for w in ("маркет", "marketing")):
+            return "marketing"
+        if any(w in low for w in ("бизнес", "mvp")):
+            return "business_manager"
+        if any(w in low for w in ("задач", "напомин", "замет")):
+            return "personal_assistant"
+        return "general"
 
     def _env_block(self, state: AgentState) -> str:
         return state.get("environment_block", "")

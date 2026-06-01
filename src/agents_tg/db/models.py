@@ -246,6 +246,87 @@ class UserContact(Base):
     )
 
 
+class AgentJob(Base):
+    """Gateway job record (Task Brain parity)."""
+
+    __tablename__ = "agent_jobs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[int] = mapped_column(index=True)
+    agent_key: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
+    trigger: Mapped[str] = mapped_column(String(32), default="inbound")
+    payload: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    idempotency_key: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
+    result_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class AgentTask(Base):
+    """Manus AgentTask FSM."""
+
+    __tablename__ = "agent_tasks"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[int] = mapped_column(index=True)
+    agent_key: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(512))
+    status: Mapped[str] = mapped_column(String(32), default="planned", index=True)
+    context_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class PlanStep(Base):
+    """Single step in a Manus plan."""
+
+    __tablename__ = "plan_steps"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    task_id: Mapped[str] = mapped_column(String(32), index=True)
+    step_index: Mapped[int] = mapped_column(index=True)
+    agent_key: Mapped[str] = mapped_column(String(64))
+    instruction: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32), default="pending", index=True)
+    result_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+
+class PendingConfirmation(Base):
+    """PG-backed confirmation gate (replaces in-memory only)."""
+
+    __tablename__ = "pending_confirmations"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    token: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    telegram_user_id: Mapped[int] = mapped_column(index=True)
+    action: Mapped[str] = mapped_column(String(128))
+    payload: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+
 class Reminder(Base):
     """Scheduled reminder delivered via Telegram (one-shot or recurring)."""
 

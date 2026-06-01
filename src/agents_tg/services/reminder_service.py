@@ -187,14 +187,42 @@ class ReminderService:
             ]
 
     async def start(self) -> None:
-        """Start background poller for due reminders."""
+        """Start background poller + APScheduler for cron parity."""
         if self._poll_task and not self._poll_task.done():
             return
         self._poll_task = asyncio.create_task(self._poll_loop())
         await self._register_morning_digest()
-        logger.info("ReminderService started (poll + morning digest)")
+        await self._start_apscheduler()
+        logger.info("ReminderService started (poll + APScheduler + morning digest)")
+
+    async def _start_apscheduler(self) -> None:
+        try:
+            from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+            if self._scheduler is not None:
+                return
+            self._scheduler = AsyncIOScheduler()
+            self._scheduler.add_job(
+                self._fire_due,
+                "interval",
+                seconds=30,
+                id="reminder_poll",
+                replace_existing=True,
+            )
+            self._scheduler.start()
+            logger.info("APScheduler started for reminder Task Brain")
+        except ImportError:
+            logger.debug("APScheduler not installed — using asyncio poll only")
+        except Exception as exc:
+            logger.warning("APScheduler start failed: %s", exc)
 
     async def stop(self) -> None:
+        if self._scheduler:
+            try:
+                self._scheduler.shutdown(wait=False)
+            except Exception:
+                pass
+            self._scheduler = None
         if self._poll_task:
             self._poll_task.cancel()
             try:

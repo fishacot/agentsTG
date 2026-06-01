@@ -101,16 +101,36 @@ class AppSettings(BaseSettings):
 
     # Proactive agent wake (OpenClaw heartbeat parity)
     HEARTBEAT_ENABLED: bool = True
-    HEARTBEAT_INTERVAL_MIN: int = 60
+    HEARTBEAT_INTERVAL_MIN: int = 30
     HEARTBEAT_QUIET_HOURS: float = 12.0
     HEARTBEAT_SKIP_IF_BUSY_MIN: int = 5
     HEARTBEAT_DIGEST_LLM: bool = True
+    HEARTBEAT_ACTIVE_HOURS_START: int = 8
+    HEARTBEAT_ACTIVE_HOURS_END: int = 23
+    HEARTBEAT_LIGHT_CONTEXT: bool = True
+    HEARTBEAT_SKIP_WHEN_BUSY: bool = True
 
     # Cron reminders → full AgentRun (LLM delivery); static fallback on failure
     REMINDER_LLM_DELIVERY: bool = True
 
     # Manus-style confirmation gates for destructive actions
     REQUIRE_CONFIRM: bool = False
+
+    # Manus outer loop
+    MAX_AGENT_TURNS: int = 15
+
+    # Progress UX
+    HUMAN_DELAY_MS_MIN: int = 800
+    HUMAN_DELAY_MS_MAX: int = 2500
+    SHOW_AGENT_THOUGHT: bool = False
+
+    # Sandbox (L4)
+    SANDBOX_ENABLED: bool = True
+    SANDBOX_REQUIRED: bool = True
+
+    # Plugin allow/deny (OpenClaw parity)
+    PLUGIN_ALLOW_LIST: str = ""
+    PLUGIN_DENY_LIST: str = ""
 
     # Paths
     ROOT_DIR: Path = Path(__file__).resolve().parent.parent.parent.parent

@@ -79,6 +79,21 @@ class AgentWakeService:
         if not settings.HEARTBEAT_ENABLED:
             return
 
+        from src.agents_tg.utils.timezone_utils import now_local
+
+        local_hour = now_local().hour
+        if not (
+            settings.HEARTBEAT_ACTIVE_HOURS_START
+            <= local_hour
+            < settings.HEARTBEAT_ACTIVE_HOURS_END
+        ):
+            logger.debug(
+                "Heartbeat skipped: outside active hours (%s–%s)",
+                settings.HEARTBEAT_ACTIVE_HOURS_START,
+                settings.HEARTBEAT_ACTIVE_HOURS_END,
+            )
+            return
+
         quiet = timedelta(hours=settings.HEARTBEAT_QUIET_HOURS)
         busy = timedelta(minutes=settings.HEARTBEAT_SKIP_IF_BUSY_MIN)
         now = datetime.now(timezone.utc)

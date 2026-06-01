@@ -175,11 +175,22 @@ async def send_agent_response(
     chunk_limit: int = 4096,
 ) -> Message | None:
     """Send agent reply; split long text into numbered parts."""
+    import asyncio
+    import random
+
+    from src.agents_tg.config.settings import get_settings
+
+    settings = get_settings()
     parts = split_telegram_html(text, limit=chunk_limit)
     total = len(parts)
     last_sent: Message | None = None
 
     for i, part in enumerate(parts, start=1):
+        if i > 1 and settings.HUMAN_DELAY_MS_MAX > 0:
+            delay_ms = random.randint(
+                settings.HUMAN_DELAY_MS_MIN, settings.HUMAN_DELAY_MS_MAX
+            )
+            await asyncio.sleep(delay_ms / 1000.0)
         body = _part_prefix(i, total) + part
         use_edit = i == 1 and thinking_message is not None
         try:

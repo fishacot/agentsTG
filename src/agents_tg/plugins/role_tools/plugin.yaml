@@ -1,0 +1,14 @@
+id: role_tools
+tools:
+  - run_code
+  - lint_test
+  - scan_prompt
+  - browser_navigate
+  - browser_snapshot
+  - track_progress
+  - list_agent_workspace
+allowed_agents:
+  - orchestrator
+  - coder
+  - research
+  - security_ai

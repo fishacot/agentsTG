@@ -16,7 +16,35 @@ def _workspace_root(telegram_user_id: int) -> Path:
     root = settings.ROOT_DIR / "workspace" / "users" / str(telegram_user_id)
     root.mkdir(parents=True, exist_ok=True)
     (root / "memory").mkdir(exist_ok=True)
+    (root / "agents").mkdir(exist_ok=True)
     return root
+
+
+def agent_workspace_dir(telegram_user_id: int, agent_key: str) -> Path:
+    """Per-agent isolated scratch dir (OpenClaw § isolation)."""
+    path = _workspace_root(telegram_user_id) / "agents" / agent_key
+    path.mkdir(parents=True, exist_ok=True)
+    try:
+        path.chmod(0o700)
+    except OSError:
+        pass
+    audit = path / "audit.log"
+    if not audit.exists():
+        audit.write_text("", encoding="utf-8")
+    return path
+
+
+def list_agent_workspaces(telegram_user_id: int) -> list[str]:
+    agents_dir = _workspace_root(telegram_user_id) / "agents"
+    if not agents_dir.is_dir():
+        return []
+    return sorted(p.name for p in agents_dir.iterdir() if p.is_dir())
+
+
+def list_agent_workspace(telegram_user_id: int, agent_key: str) -> list[str]:
+    """List files in per-agent workspace directory."""
+    path = agent_workspace_dir(telegram_user_id, agent_key)
+    return sorted(f.name for f in path.iterdir() if f.is_file())
 
 
 def write_user_md(

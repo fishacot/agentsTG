@@ -117,6 +117,68 @@ class AgentBot:
             about = self.identity.get("about", f"Я {self.agent_key}")
             await message.answer(about)
 
+        @self.router.message(Command("journal"))
+        async def cmd_journal(message: Message, state: FSMContext):
+            if not message.from_user:
+                return
+            from src.agents_tg.services.workspace_memory import _workspace_root
+
+            path = _workspace_root(message.from_user.id) / "JOURNAL.md"
+            if path.exists():
+                text = path.read_text(encoding="utf-8")[-3500:]
+                await message.answer(f"📓 <b>Журнал</b>\n<pre>{text[:3000]}</pre>", parse_mode="HTML")
+            else:
+                await message.answer("Журнал пока пуст.")
+
+        @self.router.message(Command("task"))
+        async def cmd_task(message: Message, state: FSMContext):
+            if not message.from_user:
+                return
+            from src.agents_tg.services.user_tasks_service import user_tasks_service
+
+            tasks = await user_tasks_service.list_tasks(telegram_user_id=message.from_user.id)
+            pending = [t for t in (tasks.get("tasks") or []) if t.get("status") == "pending"]
+            if not pending:
+                await message.answer("Нет активных задач.")
+                return
+            lines = "\n".join(f"• {t.get('title', '?')}" for t in pending[:15])
+            await message.answer(f"📋 <b>Задачи</b>\n{lines}", parse_mode="HTML")
+
+        @self.router.message(Command("status"))
+        async def cmd_status(message: Message, state: FSMContext):
+            from src.agents_tg.services.health_server import _pg_status
+
+            pg = await _pg_status()
+            db = "✅ PG" if pg.get("connected") else "⚠️ без PG"
+            await message.answer(f"🤖 {self.agent_key}\n{db}")
+
+        @self.router.callback_query()
+        async def on_callback(callback, state: FSMContext):
+            data = callback.data or ""
+            if data.startswith("confirm:"):
+                parts = data.split(":")
+                if len(parts) >= 3:
+                    token, decision = parts[1], parts[2]
+                    from src.agents_tg.services.confirmation_service import (
+                        confirmation_service,
+                    )
+
+                    entry = confirmation_service.consume(token)
+                    if not entry:
+                        await callback.answer("Подтверждение устарело.", show_alert=True)
+                        return
+                    await confirmation_service.persist_consume(token)
+                    if decision == "yes":
+                        await callback.message.edit_text(
+                            f"✅ Подтверждено: {entry.action}"
+                        )
+                    else:
+                        await callback.message.edit_text(
+                            f"❌ Отменено: {entry.action}"
+                        )
+                    await callback.answer()
+                return
+
         @self.router.message()
         async def handle_message(message: Message, state: FSMContext):
             """Handle direct messages and group mentions."""
@@ -196,6 +258,14 @@ class AgentBot:
                     mentions=self._extract_mentions(message.text or ""),
                 ),
             )
+
+        from src.agents_tg.channels.telegram_adapter import from_update
+        from src.agents_tg.gateway.router import gateway_router
+
+        envelope = from_update(message, self.agent_key)
+        dispatch = await gateway_router.dispatch(envelope, trigger="inbound")
+        if dispatch.duplicate:
+            return
 
         async with message_pipeline.run_lock(self.agent_key, message.chat.id):
             await state.set_state(AgentStates.processing)
@@ -350,6 +420,8 @@ class AgentBot:
                 await message_pipeline.drain_followups(
                     self.agent_key, message.chat.id
                 )
+                if dispatch.job_id:
+                    await gateway_router.complete_job(dispatch.job_id)
 
     @staticmethod
     def _is_research_intent(text: str) -> bool:
@@ -523,7 +595,8 @@ class AgentBot:
         is_group: bool,
         coordinator,
     ) -> Optional[str]:
-        """Process the request using agent's specific logic."""
+        """Process the request via L3 agent dispatch (no direct agent imports here)."""
+        from src.agents_tg.gateway.agent_dispatch import dispatch_agent_process
         from src.agents_tg.services.chat_history import chat_history
         from src.agents_tg.services.environment_context import build_environment
 
@@ -551,48 +624,14 @@ class AgentBot:
             user_message=user_text,
         )
 
-        if self.agent_key == "orchestrator":
-            from src.agents_tg.agents.orchestrator import orchestrator
-
-            return await orchestrator.process(
-                user_text,
-                user_id=user_id,
-                environment=environment,
-            )
-        elif self.agent_key == "personal_assistant":
-            from src.agents_tg.agents.personal_assistant import personal_assistant
-
-            return await personal_assistant.process(
-                user_text,
-                user_id=user_id,
-                environment=environment,
-            )
-        else:
-            from src.agents_tg.agents.specialists import (
-                business_manager,
-                coder,
-                marketing,
-                research_analyst,
-                security_ai,
-            )
-
-            agent_map = {
-                "coder": coder,
-                "research": research_analyst,
-                "security_ai": security_ai,
-                "business_manager": business_manager,
-                "marketing": marketing,
-            }
-
-            agent = agent_map.get(self.agent_key)
-            if agent:
-                return await agent.process(
-                    user_text,
-                    user_id=user_id,
-                    environment=environment,
-                )
-
-        return None
+        return await dispatch_agent_process(
+            agent_key=self.agent_key,
+            user_text=user_text,
+            user_id=user_id,
+            environment=environment,
+            is_group=is_group,
+            coordinator=coordinator,
+        )
 
     async def start(self):
         """Start this bot's polling."""
