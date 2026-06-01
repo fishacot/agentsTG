@@ -13,8 +13,8 @@
 - **Phase 3 — Memory + Manus:** `append_journal_md`, `refresh_memory_md` on facts/projects; `confirmation_service` + `REQUIRE_CONFIRM` gate on `update_project_status:done`.
 - **Phase 4 — Docs:** `AGENT_RUNTIME.md`, `AGENT_BEHAVIOR.md`, `OPENCLAW_PARITY.md` — honest done/partial/backlog.
 - **Verify:** `python -m pytest tests/ -v --tb=short` — **97 passed** (~25s).
-- **Файлы (new):** `proactive_policy.py`, `confirmation_service.py`, tests `test_proactive_policy.py`, `test_confirmation_service.py`.
-- **Deploy:** commit → push → `vps_deploy.py` + Neon configure (Phase 0 ops).
+- **Ship:** commit `5e5387b` pushed to `origin/master`.
+- **Deploy (Phase 0 ops):** `VPS_SSH_PASSWORD` / `NEON_DATABASE_URL` not in shell — run locally: `python scripts/vps_configure_neon.py` then `python scripts/vps_deploy.py`; `alembic upgrade head` on VPS.
 
 ## 2026-06-01 — Multi-agent wake + proactive_intent (runtime) ✅ verify
 
