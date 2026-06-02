@@ -6,6 +6,49 @@
 
 ---
 
+## 2026-05-31 — Readiness plan: ship + E2E matrix + README sync
+
+### Ship (`ship-prompt-security`)
+
+| Шаг | Статус | Детали |
+|-----|--------|--------|
+| Commit | ✅ | `2ec3252` — prompt-layer, orchestrator v2, `tool_policies` + hook, +3 tests |
+| Push `master` | ✅ | `origin/master` @ `2ec3252` |
+| `pytest` | ✅ | **144 passed** (~41s, local Windows) |
+| VPS deploy | ⏳ | `VPS_SSH_PASSWORD` не задан в среде агента → `python scripts/vps_deploy.py` **не запускался**. После deploy на VPS: `git pull` → `2ec3252`, `systemctl restart agents-tg`, `curl -s http://127.0.0.1:8080/` на сервере |
+
+### E2E W1–W10 (`e2e-prod-w1-w10`)
+
+Матрица после ship **2ec3252**. Легенда: **unit** = покрыто pytest; **manual** = Telegram ЛС на prod; **post-deploy** = нужен `vps_deploy` + smoke.
+
+| W | # | Сценарий | Авто (pytest / код) | Prod Telegram |
+|---|-----|----------|---------------------|---------------|
+| W1 | 1 | «Привет» → без плана | `test_prompt_tier.py` (LIGHT, no tools) | manual |
+| W1 | 2 | Длинный код → части (1/N) | `test_agent_runtime.py`, delivery | manual → Руслан |
+| W1 | 3 | Напоминание 3 мин МСК | `test_role_tools`, cron paths | manual → Эльза |
+| W1 | 4 | Рестарт до ping | — | manual (post-deploy + PG) |
+| W1 | 5 | `curl :8080/` | `test_health` if any | **post-deploy** (SSH curl на VPS) |
+| W2 | 6–9 | proactive / plan / anti-echo / digest | `test_proactive_policy`, `test_agent_wake` | manual |
+| W3 | 10–14 | memory / project / Neon persist | integration-style tests partial | manual |
+| W4 | 15–17 | envelope / dedupe / API | `test_envelope_dispatch`, `test_gateway_*` | manual #15–16; API optional |
+| W5 | 18 | injection block | `test_gateway_hooks` | manual |
+| W5 | 19 | PA `run_code` deny | **`test_tool_policy_hook`** ✅ | manual confirm |
+| W5 | 20 | Руслан `run_code` | policy allows coder | manual |
+| W6 | 21–22 | plan executor + PG | plan tests / gateway | manual → Егор |
+| W7 | 23–25 | long msg, /journal, /status | runtime + commands | manual |
+| W8 | 26–27 | confirmation gates | settings-gated | manual |
+| W9 | 28 | workspace list | registry / tools | manual |
+| W10 | 29–30 | heartbeat hours / skipWhenBusy | **`test_agent_wake`** ✅ | manual |
+
+**Итог приёмки:** код и unit-прокси для W5/W10 готовы; **полная prod-подпись W1–W10** — после `vps_deploy` пройти чеклист в [`E2E_AUTONOMY.md`](E2E_AUTONOMY.md) в Telegram (5 smoke из `FIRSTBYTE_VPS.md` + таблица выше).
+
+### README (`readme-sync`)
+
+- Убраны обещания календаря/CRM/бюджета как реализованных; таблица **planned**.
+- Добавлена таблица tools по `registry.py`, badge **personal beta**, примеры под реальные сценарии.
+
+---
+
 ## 2026-06-02 — Cursor hook: отключён stop_verify_reminder
 
 - **Запрос:** убрать follow-up «pytest + implementation-notes» в конце сессии агента.
