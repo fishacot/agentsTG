@@ -31,7 +31,8 @@
 - `OPENCLAW_PARITY.md`, `AGENT_PIPELINE.md`, legacy `bot/__init__.py` (без «календарь»).
 
 ### Verify
-- `python -m pytest tests/ -v --tb=short` — запуск после коммита.
+- `python -m pytest tests/ -v --tb=short` — **153 passed** (~58s).
+- **Git:** `c806196` pushed `origin/master`.
 
 ---
 
