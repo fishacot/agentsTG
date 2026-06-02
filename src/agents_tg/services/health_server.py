@@ -120,6 +120,20 @@ async def _handle_request(reader: asyncio.StreamReader, writer: asyncio.StreamWr
         status_code = 200
         if method == "GET" and path in ("/", "/health", "/healthz"):
             response_body = await _build_health_body()
+        elif method == "GET" and path == "/v1/models":
+            models_body = {
+                "object": "list",
+                "data": [
+                    {
+                        "id": "agents-tg-orchestrator",
+                        "object": "model",
+                        "owned_by": "agents-tg",
+                    }
+                ],
+            }
+            response_body = (
+                json.dumps(models_body, ensure_ascii=False) + "\n"
+            ).encode()
         elif method == "POST" and path == "/v1/agent/run":
             status_code, data = await _handle_agent_run(body)
             response_body = (json.dumps(data, ensure_ascii=False) + "\n").encode()

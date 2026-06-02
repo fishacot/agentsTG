@@ -1,0 +1,4 @@
+id: demo
+name: Demo parity plugin
+tools:
+  - plugin_echo

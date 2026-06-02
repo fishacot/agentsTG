@@ -49,13 +49,18 @@ async def maybe_delegate_async(
     if len(plan) < 2:
         return primary_reply
 
+    from src.agents_tg.services.progress_ux import (
+        format_plan_header,
+        format_step_progress,
+        strip_supervisor_json_leak,
+    )
+
     suffix = (
         "\n\n⏳ План из нескольких шагов — выполню по шагам "
         "и пришлю прогресс отдельными сообщениями."
     )
-    base = primary_reply if primary_reply else "<b>План:</b>\n" + "\n".join(
-        f"{i + 1}. {s}" for i, s in enumerate(plan)
-    )
+    safe_reply = strip_supervisor_json_leak(primary_reply) if primary_reply else ""
+    base = safe_reply if safe_reply else format_plan_header(plan)
 
     from_user = getattr(message, "from_user", None)
     uid = from_user.id if from_user else 0
@@ -68,8 +73,7 @@ async def maybe_delegate_async(
     )
 
     async def _progress(current: int, total: int, step_agent: str) -> None:
-        msg = f"📋 Шаг {current}/{total}: {step_agent} работает…"
-        await deliver_fn(message, msg)
+        await deliver_fn(message, format_step_progress(current, total, step_agent))
 
     async def _work() -> None:
         try:

@@ -33,7 +33,7 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
         "👋 Привет! Я AI Assistant с несколькими агентами.\n\n"
         "Доступные агенты:\n"
         "🧭 Оркестратор — распределение задач и контроль контекста\n"
-        "📅 Личный помощник — заметки (Obsidian), задачи, напоминания\n"
+        "📅 Личный помощник (Эльза) — задачи, заметки Obsidian, напоминания\n"
         "🔎 Ресерчер — поиск репозиториев/референсов/советов (интернет)\n"
         "🛡️ Security & AI — безопасность, архитектура, код-ревью\n"
         "💼 Бизнес — стратегия, планы, приоритизация\n"
@@ -128,7 +128,7 @@ async def process_callback(callback: CallbackQuery, state: FSMContext) -> None:
         await state.set_state(BotStates.idle)
         await callback.message.answer(
             "📅 Эльза (Ассистент) на связи.\n\n"
-            "Я помогаю с календарем, задачами и заметками. "
+            "Задачи, заметки Obsidian и напоминания. "
             "Чем могу помочь?"
         )
     elif agent_type == "agent_coder":

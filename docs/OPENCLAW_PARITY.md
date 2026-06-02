@@ -37,6 +37,7 @@
 | Idempotency | gateway dispatch + job_store | done |
 | HTTP agent/run | `health_server.py` POST `/v1/agent/run` | done |
 | A2A callback | POST `/v1/webhook/a2a/callback` | done (stub) |
+| GET /v1/models stub | `health_server.py` | partial |
 | WS / OpenAI-compat API | — | backlog |
 
 ## Security hooks
@@ -63,7 +64,7 @@
 
 | OpenClaw | agentsTG | Статус |
 |----------|----------|--------|
-| cron / scheduler | `reminder_service` APScheduler + poll | partial |
+| cron / scheduler | `reminder_service` APScheduler + poll | done |
 | agent turn on wake | `AgentRun(trigger=cron)` | done |
 | heartbeat | PA + orchestrator check-in | done |
 | activeHours / skipWhenBusy | `agent_wake.py` + settings | done |
@@ -75,9 +76,10 @@
 | Manus | agentsTG | Статус |
 |-------|----------|--------|
 | Plan executor | `plan_executor.py` + LangGraph loop | done |
-| Outer loop / max turns | `agent_outer_loop.py` | partial |
-| Progress UX | step messages in delegate | partial |
-| Artifacts sendDocument | `artifact_service.py` | partial |
+| Outer loop / max turns | `agent_outer_loop.py` + replan suffix | done |
+| Progress UX | `progress_ux.py` + plan_executor | done |
+| Verify-lite | `verify_step.py` | done |
+| Artifacts sendDocument | `artifact_service.py` + workspace register | done |
 | Confirmation TG buttons | `confirmation_service` + callbacks | done |
 | AgentTask FSM PG | `agent_tasks` + `plan_steps` | done |
 
@@ -94,10 +96,10 @@
 
 | OpenClaw | agentsTG | Статус |
 |----------|----------|--------|
-| Plugin registry | `plugins/registry.py` + plugin.yaml | partial |
-| MCP bridge | `mcp/client.py` stub | partial |
-| Sandbox run_code | `sandbox/docker_runner.py` | partial (subprocess, no Docker yet) |
-| Browser tools | httpx fallback in `role_tools` | partial |
+| Plugin registry | `plugins/registry.py` + demo `plugin_echo` | partial (MVP) |
+| MCP bridge | `mcp/client.py` + `MCP_ENABLED` | partial (MVP) |
+| Sandbox run_code | `sandbox/docker_runner.py` SANDBOX_MODE | done (subprocess default, docker opt-in) |
+| Browser tools | `browser_tools.py` retry + title | done |
 
 ## Multi-agent
 

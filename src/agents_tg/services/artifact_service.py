@@ -18,6 +18,30 @@ class ArtifactService:
     def register(self, artifact_id: str, path: Path) -> None:
         self._registry[artifact_id] = path
 
+    def register_workspace_file(
+        self,
+        artifact_id: str,
+        path: Path,
+        *,
+        workspace_root: Path | None = None,
+    ) -> bool:
+        """Register file if it exists under workspace (safety check)."""
+        resolved = path.resolve()
+        if workspace_root:
+            root = workspace_root.resolve()
+            try:
+                resolved.relative_to(root)
+            except ValueError:
+                logger.warning("Artifact outside workspace: %s", resolved)
+                return False
+        if not resolved.exists():
+            return False
+        self.register(artifact_id, resolved)
+        return True
+
+    def file_link_hint(self, path: Path) -> str:
+        return f"Файл: <code>{path.name}</code>"
+
     def get_path(self, artifact_id: str) -> Path | None:
         return self._registry.get(artifact_id)
 

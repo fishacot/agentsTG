@@ -52,10 +52,35 @@ class PluginRegistry:
         for manifest in plugins_dir.glob("*/plugin.yaml"):
             self.load_plugin_yaml(manifest)
 
+    def register_demo_echo_tool(self) -> None:
+        if "plugin_echo" in self._tools:
+            return
+
+        async def handler(message: str = "", **_: Any) -> dict[str, Any]:
+            return {"ok": True, "echo": message or "pong"}
+
+        self.register_tool(
+            AgentTool(
+                name="plugin_echo",
+                description="Demo plugin echo (OpenClaw plugin MVP).",
+                parameters={
+                    "type": "object",
+                    "properties": {"message": {"type": "string"}},
+                },
+                handler=handler,
+            ),
+            plugin_id="demo",
+        )
+
 
 _AGENT_TOOL_MAP: dict[str, tuple[str, ...]] = {
     "*": ("remember_about_user",),
-    "orchestrator": ("delegate_task", "track_progress", "merge_results"),
+    "orchestrator": (
+        "delegate_task",
+        "track_progress",
+        "merge_results",
+        "plugin_echo",
+    ),
     "coder": ("run_code", "lint_test"),
     "research": ("browser_navigate", "browser_snapshot", "deep_research"),
     "security_ai": ("scan_prompt",),

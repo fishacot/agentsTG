@@ -62,7 +62,10 @@ flowchart TB
 | L3 | `services/inbound_turn.py` | Turn orchestration, delivery, delegation |
 | L3 | `gateway/agent_dispatch.py` | **Single entry:** `dispatch_agent(envelope)` |
 | L3 | `services/agent_runtime.py` | `run_inbound`, `OutboundSink` |
-| L3 | `services/agent_outer_loop.py` | `MAX_AGENT_TURNS`, checkpoint |
+| L3 | `services/agent_outer_loop.py` | `MAX_AGENT_TURNS`, checkpoint, `[[REPLAN]]` |
+| L3 | `services/plan_executor.py` | Manus step runner + PG `plan_steps` |
+| L3 | `services/verify_step.py` | Verify-lite after each plan step |
+| L3 | `services/progress_ux.py` | Unified `Шаг N/M` Telegram HTML |
 | L4 | `services/prompts/` | OpenClaw-style layers: system_directives, styles/, orchestrator_directives, finalize_directives, tier_rules, assembler |
 | L4 | `gateway/tool_policies.py` | Declarative agent deny + tier allow + high-risk validators |
 | L4 | `gateway/hooks/tool_policy.py` | Deterministic before_tool tier enforcement |

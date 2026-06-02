@@ -138,22 +138,30 @@ class PlanExecutor:
     ) -> str:
         results: list[str] = []
         total = len(task.steps)
+        from src.agents_tg.services.progress_ux import format_step_done
+
         for i, (step_agent, instruction) in enumerate(task.steps):
             if progress_fn:
                 await progress_fn(i + 1, total, step_agent)
-            result = await self.execute_step(
-                task.task_id,
-                i,
-                message=message,
-                user_text=user_text,
-                process_fn=process_fn,
-                step_agent=step_agent,
-                instruction=instruction,
-            )
-            if result:
-                results.append(result)
-                if deliver_fn and i < total - 1:
-                    await deliver_fn(message, f"✅ Шаг {i + 1}/{total} готов.")
+            try:
+                result = await self.execute_step(
+                    task.task_id,
+                    i,
+                    message=message,
+                    user_text=user_text,
+                    process_fn=process_fn,
+                    step_agent=step_agent,
+                    instruction=instruction,
+                )
+            except Exception:
+                break
+            if not result:
+                break
+            if "[[REPLAN]]" in result:
+                return result
+            results.append(result)
+            if deliver_fn:
+                await deliver_fn(message, format_step_done(i + 1, total))
         return results[-1] if results else ""
 
     async def execute_step(
@@ -199,13 +207,34 @@ class PlanExecutor:
                 user_text=prompt,
                 coordinator=None,
             )
-            summary = (result or "")[:500]
+            from src.agents_tg.services.progress_ux import strip_supervisor_json_leak
+            from src.agents_tg.services.verify_step import verify_step_result
+
+            cleaned = strip_supervisor_json_leak(result or "")
+            vr = await verify_step_result(
+                instruction=instr,
+                step_summary=cleaned,
+                agent_key=agent_key,
+            )
+            if not vr.ok:
+                await self._update_step(
+                    task_id,
+                    step_index,
+                    status="failed",
+                    result_summary=(vr.issues or "verify failed")[:200],
+                )
+                await self._update_task_status(task_id, "failed")
+                if vr.suggest_replan:
+                    return f"{cleaned}\n[[REPLAN]]"
+                return cleaned
+
+            summary = cleaned[:500]
             await self._update_step(
                 task_id, step_index, status="done", result_summary=summary
             )
             status = "done" if step_index + 1 >= len(steps) else "running"
             await self._update_task_status(task_id, status)
-            return result
+            return cleaned
         except Exception as exc:
             logger.exception("Plan step failed: %s", exc)
             await self._update_step(

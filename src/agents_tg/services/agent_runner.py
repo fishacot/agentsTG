@@ -79,6 +79,7 @@ class AgentRunner:
 
         tool_list.extend(role_tools_for(agent_key))
         tool_list.extend(shared_context_tools(agent_key=agent_key))
+        self._extend_plugin_and_mcp_tools(tool_list, agent_key)
         if get_outbound_sink() is not None:
             tool_list.append(send_telegram_message_tool())
         if include_web_tools:
@@ -343,6 +344,29 @@ class AgentRunner:
         if result.get("finish_reason") == "length" and len(extra) > 100:
             return text + "\n\n" + extra + "\n\n<i>(ответ сокращён — уточните детали)</i>"
         return text + "\n\n" + extra
+
+    def _extend_plugin_and_mcp_tools(
+        self, tool_list: list[AgentTool], agent_key: str
+    ) -> None:
+        from src.agents_tg.config.settings import get_settings
+        from src.agents_tg.plugins.registry import plugin_registry
+
+        settings = get_settings()
+        plugins_dir = (
+            settings.ROOT_DIR / "src" / "agents_tg" / "plugins"
+        )
+        plugin_registry.discover(plugins_dir)
+        plugin_registry.register_demo_echo_tool()
+        names = {t.name for t in tool_list}
+        for pt in plugin_registry.tools_for_agent(agent_key):
+            if pt.name not in names:
+                tool_list.append(pt)
+                names.add(pt.name)
+        if settings.MCP_ENABLED and agent_key == "orchestrator":
+            from src.agents_tg.services.tools.mcp_tools import mcp_echo_tool
+
+            if "mcp_echo" not in names:
+                tool_list.append(mcp_echo_tool())
 
 
 agent_runner = AgentRunner()

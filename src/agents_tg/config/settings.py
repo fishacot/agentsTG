@@ -130,6 +130,12 @@ class AppSettings(BaseSettings):
     # Sandbox (L4)
     SANDBOX_ENABLED: bool = True
     SANDBOX_REQUIRED: bool = True
+    SANDBOX_MODE: str = "subprocess"  # subprocess | docker
+    SANDBOX_DOCKER_IMAGE: str = "python:3.11-slim"
+
+    # MCP (OpenClaw parity, off by default)
+    MCP_ENABLED: bool = False
+    MCP_SERVERS: str = ""  # JSON list: [{"name":"srv","command":"..."}]
 
     # Plugin allow/deny (OpenClaw parity)
     PLUGIN_ALLOW_LIST: str = ""

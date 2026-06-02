@@ -6,6 +6,35 @@
 
 ---
 
+## 2026-05-31 — Parity roadmap OpenClaw + Manus (P0–P4)
+
+### P0 Ops
+- **Deploy:** `VPS_SSH_PASSWORD` не в среде → `vps_deploy.py` не запускался. После задания пароля: `python scripts/vps_deploy.py` → smoke `curl :8080` + 5 TG сценариев из `FIRSTBYTE_VPS.md`.
+- **E2E:** матрица W1–W30 — unit-прокси расширены; prod Telegram — manual post-deploy.
+
+### P1 Manus
+- `services/verify_step.py`, `services/progress_ux.py`, интеграция в `plan_executor` + `orchestrator_delegate`.
+- `services/role_tools.py` shim → `plugins.role_tools`.
+- Тесты: `test_verify_step`, `test_plan_executor_progress`, `test_agent_outer_loop_replan`, `test_artifact_service`.
+
+### P2 OpenClaw execution
+- `SANDBOX_MODE` / `SANDBOX_DOCKER_IMAGE` в settings; `docker_runner.py` subprocess + docker.
+- `browser_tools.py` retry + `<title>` extraction.
+- `.env.example` обновлён.
+
+### P3 Platform MVP
+- `mcp/client.py` — `MCP_ENABLED`, `MCP_SERVERS` JSON, allowlist.
+- `plugins/demo/plugin.yaml` + `plugin_echo`; `services/tools/mcp_tools.py`.
+- `GET /v1/models` в `health_server.py`.
+
+### P4 Docs
+- `OPENCLAW_PARITY.md`, `AGENT_PIPELINE.md`, legacy `bot/__init__.py` (без «календарь»).
+
+### Verify
+- `python -m pytest tests/ -v --tb=short` — запуск после коммита.
+
+---
+
 ## 2026-05-31 — Readiness plan: ship + E2E matrix + README sync
 
 ### Ship (`ship-prompt-security`)
