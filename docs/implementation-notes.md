@@ -6,6 +6,16 @@
 
 ---
 
+## 2026-06-02 — VPS deploy + verify (FirstByte)
+
+- **Git:** локально и на VPS `a126373` (= `c806196` parity code + docs); `git push` — уже на `origin/master`.
+- **Deploy:** `python scripts/vps_deploy.py` — OK (`9d138d0` → `a126373`), `agents-tg` **active**, alembic OK, `apscheduler` установлен.
+- **Health (VPS):** `curl http://127.0.0.1:8080/` → `{"status":"ok","service":"agents-tg","database":{"status":"ok"}}`.
+- **Pytest (local):** `153 passed` in ~59s.
+- **Следующий шаг:** ручная приёмка Telegram по [`E2E_AUTONOMY.md`](E2E_AUTONOMY.md) (5 smoke из `FIRSTBYTE_VPS.md` + W5#19 `run_code` deny у Эльзы).
+
+---
+
 ## 2026-05-31 — Parity roadmap OpenClaw + Manus (P0–P4)
 
 ### P0 Ops
