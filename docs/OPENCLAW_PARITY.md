@@ -11,9 +11,9 @@
 | OpenClaw | Документация | agentsTG | Статус |
 |----------|--------------|----------|--------|
 | Block chunking | [streaming](https://docs.openclaw.ai/concepts/streaming) | `telegram_delivery.py` | done |
-| Preview streaming | Telegram editMessageText | — | backlog |
+| Preview streaming | Telegram editMessageText | `channels/delivery/streaming.py` + `OutboundSink` | done |
 | textChunkLimit 4096 | per channel | `split_telegram_html` | done |
-| Coalesce blocks | idleMs merge | — | backlog |
+| Coalesce blocks | idleMs merge | `gateway/coalesce.py` + `OutboundSink` | done |
 | humanDelay | 800–2500ms between bubbles | `HUMAN_DELAY_MS_*` in `telegram_delivery.py` | done |
 | Delivery retry | retry on fail | 2× retry | done |
 

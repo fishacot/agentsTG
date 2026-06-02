@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Awaitable
@@ -10,9 +11,16 @@ from typing import TYPE_CHECKING, Any, Callable, Awaitable
 if TYPE_CHECKING:
     from aiogram.types import Message
 
+from src.agents_tg.channels.delivery.streaming import PreviewStreamer
+from src.agents_tg.gateway.coalesce import BlockCoalescer
+
 logger = logging.getLogger(__name__)
 
 SILENT_REPLY = "NO_REPLY"
+
+
+def _now_ms() -> int:
+    return int(time.monotonic() * 1000)
 
 
 class TriggerKind(str, Enum):
@@ -42,22 +50,76 @@ class AgentRunResult:
         return self.messages[1:]
 
 
-class OutboundSink:
-    """Collects outbound messages during a run (multi-bubble)."""
+def _build_outbound_sink(
+    *,
+    thinking_message: Message | None = None,
+) -> OutboundSink:
+    from src.agents_tg.config.settings import get_settings
 
-    def __init__(self) -> None:
+    settings = get_settings()
+    coalesce_ms = settings.COALESCE_IDLE_MS if settings.COALESCE_IDLE_MS > 0 else 0
+    preview = settings.PREVIEW_STREAMING_ENABLED and thinking_message is not None
+    return OutboundSink(
+        coalesce_idle_ms=coalesce_ms,
+        preview_enabled=preview,
+        preview_message=thinking_message,
+    )
+
+
+class OutboundSink:
+    """Collects outbound messages during a run (coalesce + optional live preview)."""
+
+    def __init__(
+        self,
+        *,
+        coalesce_idle_ms: int = 0,
+        preview_enabled: bool = False,
+        preview_message: Message | None = None,
+    ) -> None:
+        self._coalescer: BlockCoalescer | None = (
+            BlockCoalescer(idle_ms=coalesce_idle_ms) if coalesce_idle_ms > 0 else None
+        )
+        self._preview: PreviewStreamer | None = None
+        if preview_enabled and preview_message is not None:
+            self._preview = PreviewStreamer(preview_message)
         self._messages: list[str] = []
 
-    def push(self, text: str) -> None:
+    async def push(self, text: str) -> None:
         cleaned = (text or "").strip()
         if cleaned and cleaned.upper() not in (SILENT_REPLY, "NO_REPLY"):
-            self._messages.append(cleaned)
+            if self._coalescer is not None:
+                self._coalescer.push(cleaned, _now_ms())
+                if self._preview is not None:
+                    await self._preview.update(self._coalescer.preview_text)
+            else:
+                self._messages.append(cleaned)
+                if self._preview is not None:
+                    await self._preview.update("\n\n".join(self._messages))
+
+    def drain_messages(self) -> list[str]:
+        """Committed blocks after coalesce flush, or direct pushes."""
+        if self._coalescer is not None:
+            return self._coalescer.flush()
+        return list(self._messages)
 
     @property
     def messages(self) -> list[str]:
-        return list(self._messages)
+        return self.drain_messages()
+
+    async def finalize_preview(self, text: str | None = None) -> None:
+        if self._preview is None:
+            return
+        body = text or ""
+        if not body and self._coalescer is not None:
+            body = self._coalescer.preview_text
+        elif not body and self._messages:
+            body = "\n\n".join(self._messages)
+        if body:
+            await self._preview.finalize(body)
 
     def clear(self) -> None:
+        if self._coalescer is not None:
+            self._coalescer.flush()
         self._messages.clear()
 
 
@@ -77,6 +139,15 @@ def set_outbound_sink(sink: OutboundSink | None) -> None:
 ProcessFn = Callable[..., Awaitable[str | None]]
 
 
+def _merge_run_messages(sink: OutboundSink, reply: str | None) -> list[str]:
+    messages = sink.drain_messages()
+    if reply and reply.strip():
+        cleaned = reply.strip()
+        if not messages or messages[-1] != cleaned:
+            messages.append(cleaned)
+    return messages
+
+
 class AgentRuntime:
     """Execute agent logic and merge sink + final reply."""
 
@@ -89,8 +160,10 @@ class AgentRuntime:
         user_text: str,
         is_group: bool,
         coordinator: Any,
+        thinking_message: Message | None = None,
     ) -> AgentRunResult:
-        sink = OutboundSink()
+        del agent_key, is_group  # reserved for future per-agent delivery profiles
+        sink = _build_outbound_sink(thinking_message=thinking_message)
         set_outbound_sink(sink)
         try:
             from src.agents_tg.services.llm_cooldown import llm_cooldown
@@ -118,10 +191,8 @@ class AgentRuntime:
             if reply and reply.strip().upper() in (SILENT_REPLY, "NO_REPLY"):
                 return AgentRunResult(silent=True)
 
-            messages = sink.messages
-            if reply and reply.strip():
-                if not messages or messages[-1] != reply.strip():
-                    messages.append(reply.strip())
+            messages = _merge_run_messages(sink, reply)
+            await sink.finalize_preview(messages[0] if messages else None)
 
             if not messages:
                 return AgentRunResult(messages=[])
@@ -145,7 +216,7 @@ class AgentRuntime:
         """Proactive agent turn (cron, heartbeat, event wake) without inbound message."""
         from types import SimpleNamespace
 
-        sink = OutboundSink()
+        sink = _build_outbound_sink(thinking_message=None)
         set_outbound_sink(sink)
         try:
             from src.agents_tg.utils.structured_log import log_event
@@ -187,12 +258,7 @@ class AgentRuntime:
             if reply and reply.strip().upper() in (SILENT_REPLY, "NO_REPLY", "HEARTBEAT_OK"):
                 return AgentRunResult(silent=True)
 
-            messages = sink.messages
-            if reply and reply.strip():
-                cleaned = reply.strip()
-                if cleaned.upper() != "HEARTBEAT_OK":
-                    if not messages or messages[-1] != cleaned:
-                        messages.append(cleaned)
+            messages = _merge_run_messages(sink, reply)
 
             if not messages:
                 return AgentRunResult(messages=[])

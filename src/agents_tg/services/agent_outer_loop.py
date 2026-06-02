@@ -10,6 +10,8 @@ from src.agents_tg.services.environment_context import AgentEnvironment
 
 logger = logging.getLogger(__name__)
 
+_CONTINUE_SUFFIX = "[[CONTINUE]]"
+
 
 class AgentOuterLoop:
     """Wrap agent dispatch with turn limits and checkpoint persistence."""
@@ -25,26 +27,48 @@ class AgentOuterLoop:
         **kwargs: Any,
     ) -> Optional[str]:
         settings = get_settings()
-        _ = settings.MAX_AGENT_TURNS  # reserved for future multi-turn loop
+        max_turns = max(1, settings.MAX_AGENT_TURNS)
+        current_text = user_text
+        result: Optional[str] = None
 
-        result = await self._dispatch_once(
-            agent_key=agent_key,
-            user_text=user_text,
-            user_id=user_id,
-            environment=environment,
-        )
-
-        if task_id and result:
-            from src.agents_tg.services.plan_executor import plan_executor
-
-            await plan_executor.save_checkpoint(
-                task_id,
-                {
-                    "last_result": result[:1000],
-                    "agent_key": agent_key,
-                    "status": "running",
-                },
+        for turn in range(max_turns):
+            result = await self._dispatch_once(
+                agent_key=agent_key,
+                user_text=current_text,
+                user_id=user_id,
+                environment=environment,
             )
+
+            if task_id:
+                from src.agents_tg.services.plan_executor import plan_executor
+
+                await plan_executor.save_checkpoint(
+                    task_id,
+                    {
+                        "last_result": (result or "")[:1000],
+                        "agent_key": agent_key,
+                        "turn": turn + 1,
+                        "status": "running",
+                    },
+                )
+
+            if result is None:
+                break
+
+            stripped = result.strip()
+            if stripped.upper() in ("NO_REPLY", "SILENT_REPLY"):
+                return result
+
+            if stripped.endswith(_CONTINUE_SUFFIX):
+                partial = stripped[: -len(_CONTINUE_SUFFIX)].strip()
+                current_text = (
+                    f"{user_text}\n\n[Промежуточный результат, turn {turn + 1}]: "
+                    f"{partial}"
+                )
+                continue
+
+            break
+
         return result
 
     async def run_with_runner(

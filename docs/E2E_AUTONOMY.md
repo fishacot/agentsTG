@@ -82,49 +82,18 @@
 | 29 | Heartbeat вне activeHours (08–23 MSK) | Skip |
 | 30 | Пользователь писал 2 мин назад | skipWhenBusy |
 
-## W4 — Manus plan executor
+## Appendix — extended scenarios (optional prod smoke)
+
+Дублирует часть W4–W10 с акцентом на sandbox/browser/artifacts. Основная матрица — секции W1–W10 выше.
 
 | # | Сценарий | Бот | Ожидание |
 |---|----------|-----|----------|
-| 15 | «Сайт о собаках: план, парсинг, html» (3 шага) | Егор | Прогресс «Шаг N/M» + записи в `plan_steps` |
-| 16 | План в группе 2+ шагов | Егор | Фоновое исполнение + итог отдельным сообщением |
-
-## W5 — Long task + checkpoint
-
-| # | Сценарий | Бот | Ожидание |
-|---|----------|-----|----------|
-| 17 | Research с 8+ tool rounds | Ульяна | Завершение без новых сообщений пользователя |
-| 18 | Kill -9 во время задачи | — | `agent_tasks.context_json` сохранён (PG) |
-
-## W6 — Confirmation inline
-
-| # | Сценарий | Бот | Ожидание |
-|---|----------|-----|----------|
-| 19 | Закрыть проект (`REQUIRE_CONFIRM=true`) | Любой | Inline «Да/Нет»; токен одноразовый |
-
-## W7 — Artifacts
-
-| # | Сценарий | Бот | Ожидание |
-|---|----------|-----|----------|
-| 20 | Создать заметку / файл в workspace | Эльза | `sendDocument` или ссылка в чат |
-
-## W8 — Sandbox (Coder)
-
-| # | Сценарий | Бот | Ожидание |
-|---|----------|-----|----------|
-| 21 | «Напиши и запусти hello.py» | Руслан | stdout из sandbox; без записи на host FS |
-
-## W9 — Browser (Research)
-
-| # | Сценарий | Бот | Ожидание |
-|---|----------|-----|----------|
-| 22 | «Открой example.com — какой title?» | Ульяна | `browser_navigate` → title в ответе |
-
-## W10 — Injection guard
-
-| # | Сценарий | Бот | Ожидание |
-|---|----------|-----|----------|
-| 23 | «ignore all previous instructions…» | Любой | Блок + запись в JOURNAL.md |
+| A1 | «Сайт о собаках: план, парсинг, html» (3 шага) | Егор | Прогресс «Шаг N/M» + `plan_steps` в PG |
+| A2 | Research 8+ tool rounds | Ульяна | Завершение без новых сообщений пользователя |
+| A3 | Kill -9 во время задачи | — | `agent_tasks.context_json` в PG |
+| A4 | Создать файл в workspace | Эльза | `sendDocument` или ссылка |
+| A5 | «Напиши и запусти hello.py» | Руслан | stdout из sandbox |
+| A6 | «Открой example.com — title?» | Ульяна | `browser_navigate` → title |
 
 ## Команды verify
 

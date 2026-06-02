@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import logging
-from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
 from typing import Any
 
 from src.agents_tg.services.agent_delivery_profile import get_delivery_profile
 from src.agents_tg.services.agent_prompts import FINALIZE_USER_REPLY
 from src.agents_tg.services.agent_runtime import get_outbound_sink
-from src.agents_tg.services.agent_identity import get_agent_identity
 from src.agents_tg.services.chat_history import chat_history
 from src.agents_tg.services.environment_context import AgentEnvironment
 from src.agents_tg.services.llm_client import RateLimitError, llm_client
@@ -23,154 +19,18 @@ from src.agents_tg.services.prompt_builder import (
     detect_prompt_tier,
     tools_for_tier,
 )
-from src.agents_tg.services.search_provider import deep_research
+from src.agents_tg.services.prompts.identity import prompt_identity
+from src.agents_tg.services.tools.builtin import (
+    AgentTool,
+    deep_research_tool,
+    openai_tool,
+    parse_tool_arguments,
+    remember_tool,
+    send_telegram_message_tool,
+    tool_result,
+)
 
 logger = logging.getLogger(__name__)
-
-ToolHandler = Callable[..., Awaitable[str]]
-
-
-def tool_result(**payload: Any) -> str:
-    """Machine-readable tool output for the LLM (never shown raw to the user)."""
-    return json.dumps(payload, ensure_ascii=False)
-
-
-@dataclass(frozen=True)
-class AgentTool:
-    """LLM-callable tool with async handler."""
-
-    name: str
-    description: str
-    parameters: dict[str, Any]
-    handler: ToolHandler
-
-
-def _openai_tool(tool: AgentTool) -> dict[str, Any]:
-    return {
-        "type": "function",
-        "function": {
-            "name": tool.name,
-            "description": tool.description,
-            "parameters": tool.parameters,
-        },
-    }
-
-
-def parse_tool_arguments(raw_args: str | None, user_id: str) -> dict[str, Any]:
-    """Parse Groq/OpenAI tool arguments; Groq may return JSON null."""
-    payload = raw_args or "{}"
-    try:
-        parsed = json.loads(payload)
-        args = parsed if isinstance(parsed, dict) else {}
-    except json.JSONDecodeError:
-        args = {}
-    args.setdefault("user_id", user_id)
-    return args
-
-
-def send_telegram_message_tool() -> AgentTool:
-    """Allow agent to push an intermediate user-visible message during a run."""
-
-    async def handler(**kwargs: Any) -> str:
-        from src.agents_tg.services.agent_runtime import get_outbound_sink
-
-        text = str(kwargs.get("text", "")).strip()
-        if not text:
-            return tool_result(ok=False, error="empty_text")
-        sink = get_outbound_sink()
-        if sink is None:
-            return tool_result(ok=False, error="no_active_run")
-        sink.push(text)
-        return tool_result(ok=True, queued=True, length=len(text))
-
-    return AgentTool(
-        name="send_telegram_message",
-        description=(
-            "Отправить промежуточное сообщение пользователю в Telegram "
-            "(статус, «ищу…», уточнение). Финальный ответ всё равно сформулируй."
-        ),
-        parameters={
-            "type": "object",
-            "properties": {
-                "text": {"type": "string", "description": "Текст для пользователя (HTML)"},
-            },
-            "required": ["text"],
-        },
-        handler=handler,
-    )
-
-
-def _remember_tool(agent_key: str) -> AgentTool:
-    async def handler(**kwargs: Any) -> str:
-        fact = str(kwargs.get("fact", "")).strip()
-        user_id = str(kwargs.get("user_id", "default"))
-        category = str(kwargs.get("category", "identity")).strip() or "identity"
-        if not fact:
-            return tool_result(ok=False, error="empty_fact")
-        await memory_service.add(
-            fact,
-            user_id=user_id,
-            metadata={"agent": agent_key, "category": category},
-        )
-        return tool_result(ok=True, stored=fact, category=category)
-
-    return AgentTool(
-        name="remember_about_user",
-        description=(
-            "Сохранить факт о пользователе (общая память всех агентов). "
-            "category: identity | preference | project. "
-            "Только когда он сообщает информацию о себе."
-        ),
-        parameters={
-            "type": "object",
-            "properties": {
-                "fact": {
-                    "type": "string",
-                    "description": "Краткий факт о пользователе",
-                },
-                "category": {
-                    "type": "string",
-                    "enum": ["identity", "preference", "project"],
-                    "description": "Тип факта",
-                },
-            },
-            "required": ["fact"],
-        },
-        handler=handler,
-    )
-
-
-def deep_research_tool() -> AgentTool:
-    async def handler(**kwargs: Any) -> str:
-        query = str(kwargs.get("query", "")).strip()
-        if not query:
-            return tool_result(ok=False, error="empty_query")
-        extra = kwargs.get("extra_queries") or []
-        if isinstance(extra, str):
-            extra = [extra]
-        data = await deep_research(query, extra_queries=list(extra)[:2])
-        return tool_result(**data)
-
-    return AgentTool(
-        name="deep_research",
-        description=(
-            "Глубокий поиск в интернете: результаты + содержимое топ-страниц. "
-            "Используй когда нужны актуальные данные, ссылки, сравнение решений."
-        ),
-        parameters={
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Основной поисковый запрос"},
-                "extra_queries": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Дополнительные запросы (0-2) для сложной темы",
-                },
-            },
-            "required": ["query"],
-        },
-        handler=handler,
-    )
 
 
 class AgentRunner:
@@ -198,9 +58,7 @@ class AgentRunner:
         max_tokens: int = 900,
         max_tool_rounds_override: int | None = None,
     ) -> str:
-        identity = get_agent_identity(agent_key)
-        human_name = identity.get("human_name") or agent_key
-        designation = identity.get("designation") or ""
+        human_name, designation = prompt_identity(agent_key)
 
         profile = get_delivery_profile(agent_key)
         max_tool_rounds = max_tool_rounds_override or profile.max_tool_rounds
@@ -215,7 +73,7 @@ class AgentRunner:
             max_tokens = min(max_tokens, profile_cap)
 
         tool_list = list(tools or [])
-        tool_list.append(_remember_tool(agent_key))
+        tool_list.append(remember_tool(agent_key))
         from src.agents_tg.services.role_tools import role_tools_for
         from src.agents_tg.services.shared_context_tools import shared_context_tools
 
@@ -225,6 +83,11 @@ class AgentRunner:
             tool_list.append(send_telegram_message_tool())
         if include_web_tools:
             tool_list.append(deep_research_tool())
+
+        from src.agents_tg.services.tools.registry import tool_names_for_agent
+
+        if environment and not environment.tool_names:
+            environment.tool_names = tool_names_for_agent(agent_key)
 
         if environment:
             env_block = environment.to_prompt_block()
@@ -261,9 +124,9 @@ class AgentRunner:
             user_message=user_message,
         )
 
-        from src.agents_tg.gateway.hook_registry import hook_registry as _hooks
+        from src.agents_tg.gateway.hook_registry import hook_registry
 
-        system, block_reason = await _hooks.run_before_prompt_build(
+        system, block_reason = await hook_registry.run_before_prompt_build(
             agent_key=agent_key,
             user_id=user_id,
             user_message=user_message,
@@ -279,7 +142,7 @@ class AgentRunner:
             {"role": "system", "content": system},
             {"role": "user", "content": user_message},
         ]
-        openai_tools = [_openai_tool(t) for t in active_tools]
+        openai_tools = [openai_tool(t) for t in active_tools]
         handlers = {t.name: t.handler for t in tool_list}
         tools_used = False
 

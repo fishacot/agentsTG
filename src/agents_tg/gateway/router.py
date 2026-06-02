@@ -71,6 +71,11 @@ class GatewayRouter:
             envelope=bound,
         )
 
+    async def start_job(self, job_id: str) -> None:
+        """Transition queued → running when processing begins."""
+        if job_id:
+            await job_store.transition(job_id, "running")
+
     async def complete_job(
         self,
         job_id: str,
@@ -79,7 +84,16 @@ class GatewayRouter:
         result_summary: str | None = None,
     ) -> None:
         if job_id:
-            await job_store.update_status(job_id, status, result_summary=result_summary)
+            await job_store.transition(job_id, status, result_summary=result_summary)
+
+    async def fail_job(
+        self,
+        job_id: str,
+        *,
+        result_summary: str | None = None,
+    ) -> None:
+        if job_id:
+            await job_store.transition(job_id, "failed", result_summary=result_summary)
 
     async def handle_a2a_callback(self, payload: dict[str, Any]) -> dict[str, Any]:
         """A2A webhook stub — mark job done from external agent."""
@@ -91,7 +105,7 @@ class GatewayRouter:
         job = await job_store.get(job_id)
         if not job:
             return {"ok": False, "error": "job_not_found"}
-        await job_store.update_status(
+        await job_store.transition(
             job_id, status, result_summary=str(summary) if summary else None
         )
         return {"ok": True, "job_id": job_id, "status": status}

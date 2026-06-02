@@ -6,6 +6,60 @@
 
 ---
 
+## 2026-05-31 — Hook verify (pipeline core files, re-run)
+
+- **Trigger:** post-edit hook after changes in `agent_bot.py`, `settings.py`, `agent_dispatch.py`, `job_store.py`, `router.py`, `agent_outer_loop.py`, `agent_prompts.py`, `agent_runner.py`.
+- **Diff (uncommitted):** 8 files, −930/+159 LOC — thin `agent_bot`, envelope-first `agent_dispatch`, job FSM in `job_store`/`router`, prompt shims, outer loop multi-turn.
+- **Verify:** `python -m pytest tests/ -v --tb=short` — **131 passed** in 34.19s (Windows, local).
+- **Status:** no regressions; envelope-first dispatch + job FSM + prompt shims + outer loop stable.
+
+## 2026-06-01 — SA-OPS-LOCK + SA-DOCS-E2E (pipeline workplan)
+
+- **poetry.lock:** added `apscheduler` 3.11.2 + updated `content-hash`; `poetry check` green locally.
+- **Docs:** `docs/AGENT_PIPELINE.md` (flow + file map); `AGENT_RUNTIME.md` synced; `E2E_AUTONOMY.md` deduped (appendix A1–A6).
+- **Verify:** `python -m pytest tests/ -v --tb=short` — **131 passed** (incl. `test_envelope_dispatch.py`, heartbeat active-hours fix).
+- **Deploy:** run `python scripts/vps_deploy.py` after push (needs `VPS_SSH_PASSWORD`).
+
+## 2026-06-01 — SA-PROMPT-L4 (prompts package split)
+
+- **New package** `src/agents_tg/services/prompts/`: `behavior.py` (constants), `tier_rules.py` (regex tiers + trim), `identity.py` (soul loader + `prompt_identity`), `memory_block.py` (memory + `build_scheduled_context`), `assembler.py` (`build_system_prompt`), `__init__.py` re-exports.
+- **Shims:** `agent_prompts.py`, `prompt_builder.py` re-export from `prompts` for backward compat.
+- **Tools:** builtin tools moved to `services/tools/builtin.py`; `agent_runner.py` keeps loop only; fixed `hook_registry` NameError in tool hook path.
+- **Bootstrap:** `bootstrap_context.py` uses `human_name_for()` instead of duplicate `_AGENT_NAMES`.
+- **Tests:** `tests/test_prompt_tier.py` (tier detection, soul load, assembler); legacy `test_prompt_builder.py` unchanged.
+- **Verify:** `pytest tests/ -v` — **128 passed**.
+
+---
+
+## 2026-06-01 — SA-DELIVERY-UX (preview + coalesce)
+
+- **C1:** `channels/delivery/streaming.py` — `PreviewStreamer` edits thinking message via `editMessageText` (throttled pseudo-stream + cursor).
+- **C2:** `gateway/coalesce.py` — `BlockCoalescer` merges short blocks within `COALESCE_IDLE_MS`.
+- **C3:** `OutboundSink` in `agent_runtime.py` — async `push`, coalesce drain, preview; `send_telegram_message` awaits sink; inbound passes `thinking_message` only from bot call site.
+- **C4:** `PREVIEW_STREAMING_ENABLED` (default true), `COALESCE_IDLE_MS` (default 400; 0 = off) in `settings.py`.
+- **Tests:** `tests/test_coalesce.py` (5), extended `test_agent_runtime.py`.
+- **Docs:** `OPENCLAW_PARITY.md` — preview/coalesce → **done**.
+- **Verify:** `python -m pytest tests/ -v --tb=short` → **128 passed** (~40s).
+
+---
+
+## 2026-06-01 — SA-ARCH-PIPELINE (handler split + gateway FSM)
+
+- **A1:** `agent_bot.py` slim shell (~140 LOC); handlers → `bots/handlers/{commands,inbound,callbacks}.py`.
+- **A2:** Delivery/delegation → `services/inbound_turn.py`.
+- **A3:** Single L3 entry `dispatch_agent(envelope)`; removed `dispatch_agent_process` bypass from bot.
+- **A4:** Job FSM `queued → running → done/failed` via `job_store.transition()` + `router.start_job` / `fail_job`.
+- **A5:** `services/tools/registry.py` — `tool_names_for_agent`; used in `agent_dispatch`, `agent_runner`.
+- **A6:** `AgentOuterLoop.run` multi-turn loop up to `MAX_AGENT_TURNS` (optional `[[CONTINUE]]` suffix).
+- **Verify:** `python -m pytest tests/ -v --tb=short` — **131 passed** (incl. `test_envelope_dispatch.py`, heartbeat active-hours fix).
+
+## 2026-05-31 - Neon sslmode fix (asyncpg + Neon)
+
+- **Problem:** Neon/libpq connection strings include query params (`sslmode`, `channel_binding`, `sslrootcert`, `sslcert`, `sslkey`) that SQLAlchemy/asyncpg forwards to `asyncpg.connect()` as invalid kwargs.
+- **Fix (`src/agents_tg/config/settings.py`):** `normalize_database_url()` strips those libpq params after driver rewrite (`postgresql+asyncpg://`); other query keys preserved.
+- **Fix (`src/agents_tg/db/session.py`):** `_neon_ssl_connect_args()` sets `connect_args={'ssl': True}` when host contains `neon.tech` or raw URL still mentions `sslmode=require|verify`; merged in `create_engine()`.
+- **Verify:** `python -m pytest tests/ -v --tb=short` — **111 passed**, 0 failed (~25s, local Windows).
+
 ## 2026-06-01 — Neon asyncpg: strip libpq ssl params + VPS deploy
 
 - **Problem:** Alembic/app on VPS failed — asyncpg `connect()` got unexpected kwargs `channel_binding`, `sslmode` from Neon `DATABASE_URL` query string.

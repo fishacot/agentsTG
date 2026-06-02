@@ -124,6 +124,8 @@ class AppSettings(BaseSettings):
     HUMAN_DELAY_MS_MIN: int = 800
     HUMAN_DELAY_MS_MAX: int = 2500
     SHOW_AGENT_THOUGHT: bool = False
+    PREVIEW_STREAMING_ENABLED: bool = True
+    COALESCE_IDLE_MS: int = 400
 
     # Sandbox (L4)
     SANDBOX_ENABLED: bool = True

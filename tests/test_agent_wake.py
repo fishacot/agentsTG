@@ -82,6 +82,7 @@ async def test_heartbeat_pass_wakes_quiet_user():
 
     now = datetime.now(timezone.utc)
     quiet = now - timedelta(hours=13)
+    noon_local = datetime(2026, 6, 1, 12, 0, 0)
     with patch(
         "src.agents_tg.services.agent_wake.user_contact_service.list_wake_candidates",
         new=AsyncMock(
@@ -96,6 +97,9 @@ async def test_heartbeat_pass_wakes_quiet_user():
                 }
             ]
         ),
+    ), patch(
+        "src.agents_tg.utils.timezone_utils.now_local",
+        return_value=noon_local,
     ), patch(
         "src.agents_tg.services.agent_wake.agent_runtime.run_scheduled",
         new=AsyncMock(

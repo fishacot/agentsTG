@@ -6,21 +6,13 @@ import logging
 from pathlib import Path
 
 from src.agents_tg.services.prompt_builder import PromptTier
+from src.agents_tg.services.prompts.identity import human_name_for
 from src.agents_tg.services.shared_context import shared_context
 from src.agents_tg.utils.timezone_utils import now_local, now_local_display
 
 logger = logging.getLogger(__name__)
 
 _TOOLS_DIR = Path(__file__).resolve().parent.parent / "agents" / "tools"
-_AGENT_NAMES = {
-    "orchestrator": "Егор",
-    "personal_assistant": "Эльза",
-    "coder": "Руслан",
-    "research": "Ульяна",
-    "security_ai": "Артём",
-    "business_manager": "Ваня",
-    "marketing": "Тася",
-}
 
 
 def build_time_block() -> str:
@@ -105,7 +97,7 @@ async def build_focus_block(
     if activities:
         lines.append("- Недавняя работа коллег:")
         for a in activities:
-            agent = _AGENT_NAMES.get(a["agent_key"], a["agent_key"])
+            agent = human_name_for(a["agent_key"])
             lines.append(f"  • {agent}: {a['summary'][:120]}")
     return "\n".join(lines)
 

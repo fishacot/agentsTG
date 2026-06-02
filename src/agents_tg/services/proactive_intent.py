@@ -134,11 +134,6 @@ async def try_schedule_from_message(
 
 
 def build_scheduled_context(lines: list[str]) -> str:
-    if not lines:
-        return ""
-    return (
-        "\n\n## Уже выполнено планировщиком (факт)\n"
-        + "\n".join(lines)
-        + "\nПодтверди пользователю, что автономная доставка настроена. "
-        "Не говори, что не можешь писать сама — сервер уже запланировал отправку."
-    )
+    from src.agents_tg.services.prompts.memory_block import build_scheduled_context as _build
+
+    return _build(lines)

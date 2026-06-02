@@ -20,20 +20,16 @@ Trigger (inbound | cron | background | delegation)
 - `proactive_policy` — heartbeat только у PA; check-in у orchestrator
 - `run_event_wake` — background research + async delegation
 - Chat history в PG; Neon persistence (если `DATABASE_URL` на VPS)
+- **Gateway L1–L3:** envelope → `dispatch_agent` → outer loop (см. [AGENT_PIPELINE.md](AGENT_PIPELINE.md))
+- **Delivery:** preview streaming, coalesce, humanDelay, chunking (`OutboundSink`)
 
-**Env:** `REMINDER_LLM_DELIVERY`, `HEARTBEAT_*`, `REQUIRE_CONFIRM` (confirmation gates).
+**Env:** `REMINDER_LLM_DELIVERY`, `HEARTBEAT_*`, `REQUIRE_CONFIRM`, `PREVIEW_STREAMING_ENABLED`, `COALESCE_IDLE_MS`.
 
-## Целевое состояние (полный OpenClaw parity)
+## Backlog (не блокирует prod)
 
-```
-Trigger (inbound | cron | delegation)
-  → AgentRun(session_id, agent_key)
-  → loop: LLM + tools
-  → OutboundSink: 0..N Telegram messages
-  → optional: schedule / background task
-```
-
-Остаётся backlog: preview streaming, humanDelay, gateway layer, calendar tool, weekly cron.
+- Calendar tool, weekly cron recurrence E2E
+- WS / OpenAI-compat API (см. [OPENCLAW_SIDECAR_EVAL.md](OPENCLAW_SIDECAR_EVAL.md))
+- Docker sandbox, real browser, MCP beyond stub
 
 ## Триггеры
 
@@ -64,5 +60,6 @@ Trigger (inbound | cron | delegation)
 ## Связанные документы
 
 - [OPENCLAW_PARITY.md](OPENCLAW_PARITY.md) — матрица done/partial/backlog
-- [E2E_AUTONOMY.md](E2E_AUTONOMY.md) — приёмка W1–W3
+- [E2E_AUTONOMY.md](E2E_AUTONOMY.md) — приёмка W1–W30
+- [AGENT_PIPELINE.md](AGENT_PIPELINE.md) — inbound flow + file map
 - [PROJECT_VERIFICATION.md](PROJECT_VERIFICATION.md) — verify

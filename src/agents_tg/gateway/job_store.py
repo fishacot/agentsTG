@@ -16,6 +16,15 @@ JOB_STATUSES = frozenset(
     {"queued", "running", "waiting_confirm", "done", "failed", "cancelled"}
 )
 
+JOB_TRANSITIONS: dict[str, frozenset[str]] = {
+    "queued": frozenset({"running", "cancelled", "failed"}),
+    "running": frozenset({"done", "failed", "waiting_confirm", "cancelled"}),
+    "waiting_confirm": frozenset({"running", "done", "failed", "cancelled"}),
+    "done": frozenset(),
+    "failed": frozenset({"queued"}),
+    "cancelled": frozenset(),
+}
+
 
 class AgentJobStore:
     """CRUD for agent_jobs table."""
@@ -105,6 +114,36 @@ class AgentJobStore:
             except Exception as exc:
                 logger.debug("PG job get failed: %s", exc)
         return self._memory.get(job_id)
+
+    def can_transition(self, current: str, new_status: str) -> bool:
+        if new_status not in JOB_STATUSES:
+            return False
+        allowed = JOB_TRANSITIONS.get(current, frozenset())
+        return new_status in allowed or current == new_status
+
+    async def transition(
+        self,
+        job_id: str,
+        new_status: str,
+        *,
+        result_summary: str | None = None,
+    ) -> bool:
+        """Apply FSM transition; returns False if job missing or transition invalid."""
+        job = await self.get(job_id)
+        if not job:
+            logger.warning("Job transition skipped — not found: %s", job_id)
+            return False
+        current = job.get("status", "queued")
+        if not self.can_transition(current, new_status):
+            logger.warning(
+                "Invalid job transition %s: %s → %s",
+                job_id,
+                current,
+                new_status,
+            )
+            return False
+        await self.update_status(job_id, new_status, result_summary=result_summary)
+        return True
 
     async def update_status(
         self,
