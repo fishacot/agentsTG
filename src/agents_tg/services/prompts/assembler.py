@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from src.agents_tg.services.prompts.behavior import (
+from src.agents_tg.services.prompts.styles.specialist import WEB_TOOL_HINT
+from src.agents_tg.services.prompts.system_directives import (
     GOAL_DIRECTIVE,
     TELEGRAM_AGENT_PROTOCOL,
     TELEGRAM_HTML_FORMAT,
-    WEB_TOOL_HINT,
 )
 from src.agents_tg.services.prompts.tier_rules import (
     PromptTier,

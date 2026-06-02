@@ -11,6 +11,7 @@ from src.agents_tg.services.environment_context import AgentEnvironment
 logger = logging.getLogger(__name__)
 
 _CONTINUE_SUFFIX = "[[CONTINUE]]"
+_REPLAN_SUFFIX = "[[REPLAN]]"
 
 
 class AgentOuterLoop:
@@ -49,6 +50,11 @@ class AgentOuterLoop:
                         "agent_key": agent_key,
                         "turn": turn + 1,
                         "status": "running",
+                        "action_type": "continue"
+                        if _CONTINUE_SUFFIX in (result or "")
+                        else "replan"
+                        if _REPLAN_SUFFIX in (result or "")
+                        else "step",
                     },
                 )
 
@@ -66,6 +72,15 @@ class AgentOuterLoop:
                     f"{partial}"
                 )
                 continue
+
+            if stripped.endswith(_REPLAN_SUFFIX) or _REPLAN_SUFFIX in stripped:
+                partial = stripped.replace(_REPLAN_SUFFIX, "").strip()
+                current_text = (
+                    f"{user_text}\n\n{_REPLAN_SUFFIX}\n"
+                    f"[Результат шага {turn + 1}]: {partial}"
+                )
+                if agent_key == "orchestrator":
+                    continue
 
             break
 

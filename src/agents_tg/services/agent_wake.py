@@ -131,10 +131,12 @@ class AgentWakeService:
                 tg_uid = int(row["telegram_user_id"])
                 chat_id = int(row["chat_id"])
                 hours_silent = round((now - last_in).total_seconds() / 3600, 1)
+                from src.agents_tg.services.prompts.proactive import HEARTBEAT_WAKE_PROMPT
+
                 heartbeat_md = load_heartbeat_md(tg_uid)
                 prompt = (
                     f"[Проактивный heartbeat — пользователь молчит ~{hours_silent} ч.]\n"
-                    "Выполни чеклист HEARTBEAT. Если нечего сказать — ответь ровно HEARTBEAT_OK.\n\n"
+                    f"{HEARTBEAT_WAKE_PROMPT.strip()}\n\n"
                     f"## HEARTBEAT.md\n{heartbeat_md}"
                 )
                 await self._run_and_deliver(

@@ -44,8 +44,20 @@
 | OpenClaw | agentsTG | Статус |
 |----------|----------|--------|
 | before_prompt_build | `hook_registry` + injection_guard | done |
-| before_tool_call | sandbox + deny per agent | done |
-| after_tool_exec | JOURNAL.md audit | done |
+| before_tool_call | `tool_policy` hook + `tool_policies.py` (tier + deny + validators) | done |
+| after_tool_exec | JOURNAL.md audit (+ tier in payload) | done |
+
+## Prompt layer (OpenClaw-style)
+
+| OpenClaw | agentsTG | Статус |
+|----------|----------|--------|
+| SOUL.md | `agents/souls/*.md` | done |
+| system directives | `prompts/system_directives.py` | done |
+| per-agent style | `prompts/styles/` | done |
+| orchestrator routing JSON v2 | `orchestrator_directives.py` + `supervisor_parse.py` | done |
+| finalize pass | `finalize_directives.py` (structured HTML) | done |
+| proactive wake | `prompts/proactive.py` + `agent_wake.py` | done |
+| replan directive | `REPLAN_DIRECTIVE` + orchestrator | done |
 
 ## Time & autonomy
 

@@ -7,9 +7,11 @@ from src.agents_tg.services.prompts.behavior import (
     MANUS_SPECIALIST_STYLE,
     ORCHESTRATOR_DIRECT_REPLY_HTML,
     ORCHESTRATOR_JSON_DIRECTIVE,
+    REPLAN_DIRECTIVE,
     TELEGRAM_AGENT_PROTOCOL,
     TELEGRAM_HTML_FORMAT,
     WEB_TOOL_HINT,
+    build_finalize_prompt,
 )
 
 __all__ = [
@@ -19,7 +21,9 @@ __all__ = [
     "MANUS_SPECIALIST_STYLE",
     "ORCHESTRATOR_DIRECT_REPLY_HTML",
     "ORCHESTRATOR_JSON_DIRECTIVE",
+    "REPLAN_DIRECTIVE",
     "TELEGRAM_AGENT_PROTOCOL",
     "TELEGRAM_HTML_FORMAT",
     "WEB_TOOL_HINT",
+    "build_finalize_prompt",
 ]

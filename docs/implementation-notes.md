@@ -6,6 +6,31 @@
 
 ---
 
+## 2026-06-02 — Cursor hook: отключён stop_verify_reminder
+
+- **Запрос:** убрать follow-up «pytest + implementation-notes» в конце сессии агента.
+- **Изменения:** удалён блок `stop` из `.cursor/hooks.json`; скрипт `.cursor/hooks/stop_verify_reminder.py` оставлен в репо (можно вернуть).
+- **Доки:** `.cursor/README.md`, `.cursor/rules/team-kit-workflow.mdc`.
+- **Напоминание:** verify и журнал по-прежнему в `agent-workflow-core.mdc` / `task-closure-protocol.mdc` — вручную или по запросу.
+- **После правки:** перезагрузить окно Cursor (Hooks).
+
+## 2026-05-31 — Hook verify (prompt-layer + orchestrator + hooks, re-run)
+
+- **Trigger:** post-edit hook — `orchestrator.py`, `personal_assistant.md`, `hook_registry.py`, `hooks/__init__.py`, `injection_guard.py`, `agent_outer_loop.py`, `agent_prompts.py`, `agent_runner.py`.
+- **Verify:** `python -m pytest tests/ -v --tb=short` — **144 passed** in 46.1s (Windows, local).
+- **Status:** no regressions; orchestrator v2 + tool_policy hook + finalize/replan stable.
+
+## 2026-05-31 — Prompt-layer + tool security (ответ на промт.md)
+
+- **Baseline commit:** `5708f29` — pipeline handlers, prompts package, coalesce.
+- **Prompt decomposition:** `system_directives.py`, `styles/{personal_assistant,specialist}.py`, `orchestrator_directives.py`, `finalize_directives.py`, `proactive.py`; `behavior.py` → re-export shim.
+- **Orchestrator v2:** `supervisor_parse.normalize_supervisor_data()` — `action_type`, `reasoning`, `request_replan`; legacy `next_agent` compat.
+- **Finalizer:** structured E.3 HTML template via `build_finalize_prompt(has_tool_results=…)`.
+- **Security:** `gateway/tool_policies.py` + `hooks/tool_policy.py`; tier/user_message context in `hook_registry.run_before_tool_call`.
+- **Replan:** `REPLAN_DIRECTIVE`, orchestrator replan on specialist errors / `[[REPLAN]]`, outer loop checkpoint `action_type`.
+- **Soul:** `personal_assistant.md` — убраны дубли TOOLS (ссылка на MANUS_PA_STYLE).
+- **Verify:** `python -m pytest tests/ -v --tb=short` — **144 passed**.
+
 ## 2026-05-31 — Hook verify (pipeline core files, re-run)
 
 - **Trigger:** post-edit hook after changes in `agent_bot.py`, `settings.py`, `agent_dispatch.py`, `job_store.py`, `router.py`, `agent_outer_loop.py`, `agent_prompts.py`, `agent_runner.py`.

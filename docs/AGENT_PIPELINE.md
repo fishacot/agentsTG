@@ -63,7 +63,9 @@ flowchart TB
 | L3 | `gateway/agent_dispatch.py` | **Single entry:** `dispatch_agent(envelope)` |
 | L3 | `services/agent_runtime.py` | `run_inbound`, `OutboundSink` |
 | L3 | `services/agent_outer_loop.py` | `MAX_AGENT_TURNS`, checkpoint |
-| L4 | `services/prompts/` | identity, behavior, tier_rules, assembler |
+| L4 | `services/prompts/` | OpenClaw-style layers: system_directives, styles/, orchestrator_directives, finalize_directives, tier_rules, assembler |
+| L4 | `gateway/tool_policies.py` | Declarative agent deny + tier allow + high-risk validators |
+| L4 | `gateway/hooks/tool_policy.py` | Deterministic before_tool tier enforcement |
 | L4 | `services/tools/registry.py` | Per-agent tool name matrix |
 | L4 | `services/agent_runner.py` | LLM + tool loop only |
 | Out | `channels/delivery/streaming.py` | Preview `editMessageText` |

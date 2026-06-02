@@ -61,14 +61,24 @@ class HookRegistry:
         user_id: str,
         tool_name: str,
         args: dict[str, Any],
+        context: dict[str, Any] | None = None,
     ) -> tuple[bool, str | None]:
         for hook in self._before_tool:
-            result = await hook(
-                agent_key=agent_key,
-                user_id=user_id,
-                tool_name=tool_name,
-                args=args,
-            )
+            try:
+                result = await hook(
+                    agent_key=agent_key,
+                    user_id=user_id,
+                    tool_name=tool_name,
+                    args=args,
+                    context=context,
+                )
+            except TypeError:
+                result = await hook(
+                    agent_key=agent_key,
+                    user_id=user_id,
+                    tool_name=tool_name,
+                    args=args,
+                )
             if result and result.get("deny"):
                 return False, str(result.get("reason", "denied"))
         return True, None
@@ -82,17 +92,29 @@ class HookRegistry:
         args: dict[str, Any],
         output: str,
         error: str | None = None,
+        context: dict[str, Any] | None = None,
     ) -> None:
         for hook in self._after_tool:
             try:
-                await hook(
-                    agent_key=agent_key,
-                    user_id=user_id,
-                    tool_name=tool_name,
-                    args=args,
-                    output=output,
-                    error=error,
-                )
+                try:
+                    await hook(
+                        agent_key=agent_key,
+                        user_id=user_id,
+                        tool_name=tool_name,
+                        args=args,
+                        output=output,
+                        error=error,
+                        context=context,
+                    )
+                except TypeError:
+                    await hook(
+                        agent_key=agent_key,
+                        user_id=user_id,
+                        tool_name=tool_name,
+                        args=args,
+                        output=output,
+                        error=error,
+                    )
             except Exception as exc:
                 logger.warning("after_tool hook failed: %s", exc)
 

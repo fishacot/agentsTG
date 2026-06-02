@@ -16,10 +16,13 @@ from src.agents_tg.agents.specialists import (
     research_analyst,
     security_ai,
 )
+from src.agents_tg.config.settings import get_settings
 from src.agents_tg.services.agent_prompts import (
     ORCHESTRATOR_DIRECT_REPLY_HTML,
     ORCHESTRATOR_JSON_DIRECTIVE,
+    REPLAN_DIRECTIVE,
 )
+from src.agents_tg.utils.structured_log import log_event
 from src.agents_tg.services.llm_client import llm_client
 from src.agents_tg.services.memory_service import memory_service
 from src.agents_tg.services.prompt_builder import (
@@ -124,8 +127,8 @@ class Orchestrator:
         """Loop back to supervisor until plan complete or max steps."""
         plan = state.get("plan") or []
         step = state.get("current_step", 0)
-        max_steps = max(len(plan), 1) + 2
-        if plan and step < len(plan):
+        max_steps = get_settings().MAX_AGENT_TURNS
+        if plan and step < len(plan) and step < max_steps:
             return "supervisor"
         if step >= max_steps:
             return "end"
@@ -182,6 +185,19 @@ class Orchestrator:
             memory_context = f"\n\nПАМЯТЬ:\n{memory_lines}"
 
         soul_short = "\n".join(orchestrator_soul.splitlines()[:18])
+        replan_block = ""
+        if "[[REPLAN]]" in str(user_content) or (
+            last_name
+            and last_name not in ("supervisor", None, "")
+            and self._specialist_needs_replan(
+                str(
+                    last_message.content
+                    if hasattr(last_message, "content")
+                    else last_message
+                )
+            )
+        ):
+            replan_block = f"\n\n{REPLAN_DIRECTIVE}"
 
         messages = [
             {
@@ -190,7 +206,7 @@ class Orchestrator:
                     f"{soul_short}\n{env_block}{memory_context}\n\n"
                     f"{ORCHESTRATOR_JSON_DIRECTIVE}\n"
                     f"{ORCHESTRATOR_DIRECT_REPLY_HTML}\n\n"
-                    f"{ORCHESTRATOR_ROUTING_PROMPT}"
+                    f"{ORCHESTRATOR_ROUTING_PROMPT}{replan_block}"
                 ),
             },
             {"role": "user", "content": user_content},
@@ -244,9 +260,29 @@ class Orchestrator:
                     "current_step": 1,
                 }
 
+        if data.get("request_replan"):
+            log_event(
+                "supervisor_replan",
+                reasoning=(data.get("thought") or "")[:200],
+            )
+            return {
+                "next_agent": "general",
+                "plan": data.get("plan") or [],
+                "direct_reply": "",
+                "current_step": state.get("current_step", 0) + 1,
+            }
+
         next_agent = data.get("next_agent", "general")
         plan = data.get("plan", state.get("plan", []))
         direct_reply = (data.get("direct_reply") or "").strip()
+        thought = (data.get("thought") or "").strip()
+        if thought:
+            log_event(
+                "supervisor_routing",
+                next_agent=next_agent,
+                action_type=data.get("action_type", "legacy"),
+                reasoning=thought[:200],
+            )
 
         return {
             "next_agent": next_agent,
@@ -254,6 +290,19 @@ class Orchestrator:
             "direct_reply": direct_reply,
             "current_step": state.get("current_step", 0) + 1,
         }
+
+    @staticmethod
+    def _specialist_needs_replan(text: str) -> bool:
+        low = (text or "").lower()
+        markers = (
+            "ошибк",
+            "не смог",
+            "не удалось",
+            "unknown_tool",
+            "denied",
+            "error:",
+        )
+        return any(m in low for m in markers)
 
     def router(self, state: AgentState) -> str:
         """Routing logic based on next_agent state."""

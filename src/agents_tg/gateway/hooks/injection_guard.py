@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from src.agents_tg.gateway.tool_policies import is_tool_denied_for_agent_with_args
 from src.agents_tg.utils.structured_log import log_event
 
 _INJECTION_PATTERNS = [
@@ -14,12 +15,6 @@ _INJECTION_PATTERNS = [
     re.compile(r"<\s*system\s*>", re.I),
     re.compile(r"reveal\s+(your\s+)?(system\s+)?prompt", re.I),
 ]
-
-_SANDBOX_REQUIRED = frozenset({"run_code", "fetch_url", "deploy_hook"})
-_TOOL_DENY_BY_AGENT: dict[str, frozenset[str]] = {
-    "personal_assistant": frozenset({"run_code", "deploy_hook"}),
-    "orchestrator": frozenset({"run_code"}),
-}
 
 
 async def before_prompt_injection_guard(
@@ -53,14 +48,11 @@ async def before_tool_sandbox_guard(
     user_id: str,
     tool_name: str,
     args: dict[str, Any],
+    context: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    denied = _TOOL_DENY_BY_AGENT.get(agent_key, frozenset())
-    if tool_name in denied:
-        return {"deny": True, "reason": f"tool {tool_name} not allowed for {agent_key}"}
-
-    if tool_name in _SANDBOX_REQUIRED and agent_key not in ("coder", "orchestrator"):
-        return {"deny": True, "reason": f"{tool_name} requires coder agent"}
-
+    deny = is_tool_denied_for_agent_with_args(agent_key, tool_name, args)
+    if deny:
+        return {"deny": True, "reason": deny}
     return None
 
 
@@ -72,7 +64,9 @@ async def after_tool_audit(
     args: dict[str, Any],
     output: str,
     error: str | None = None,
+    context: dict[str, Any] | None = None,
 ) -> None:
+    ctx = context or {}
     event = "tool_error" if error else "tool_call"
     log_event(
         event,
@@ -80,6 +74,7 @@ async def after_tool_audit(
         user_id=user_id,
         tool=tool_name,
         error=error,
+        tier=ctx.get("tier"),
     )
     uid = int(user_id) if user_id.isdigit() else 0
     if uid:
@@ -89,7 +84,12 @@ async def after_tool_audit(
             uid,
             agent_key=agent_key,
             event=event,
-            payload={"tool": tool_name, "error": error, "ok": error is None},
+            payload={
+                "tool": tool_name,
+                "error": error,
+                "ok": error is None,
+                "tier": str(ctx.get("tier", "")),
+            },
         )
 
 

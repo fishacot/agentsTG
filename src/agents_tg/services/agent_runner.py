@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from src.agents_tg.services.agent_delivery_profile import get_delivery_profile
-from src.agents_tg.services.agent_prompts import FINALIZE_USER_REPLY
+from src.agents_tg.services.prompts.finalize_directives import build_finalize_prompt
 from src.agents_tg.services.agent_runtime import get_outbound_sink
 from src.agents_tg.services.chat_history import chat_history
 from src.agents_tg.services.environment_context import AgentEnvironment
@@ -144,6 +144,12 @@ class AgentRunner:
         ]
         openai_tools = [openai_tool(t) for t in active_tools]
         handlers = {t.name: t.handler for t in tool_list}
+        tool_hook_context = {
+            "tier": tier,
+            "user_message": user_message,
+            "include_web_tools": include_web_tools,
+            "registered_tools": tool_list,
+        }
         tools_used = False
 
         try:
@@ -196,6 +202,7 @@ class AgentRunner:
                             user_id=user_id,
                             tool_name=name,
                             args=args,
+                            context=tool_hook_context,
                         )
                         if not allowed:
                             tool_output = tool_result(ok=False, error=reason or "denied")
@@ -212,6 +219,7 @@ class AgentRunner:
                                     args=args,
                                     output="",
                                     error=str(exc),
+                                    context=tool_hook_context,
                                 )
                                 messages.append(
                                     {
@@ -227,6 +235,7 @@ class AgentRunner:
                             tool_name=name,
                             args=args,
                             output=tool_output,
+                            context=tool_hook_context,
                         )
 
                     messages.append(
@@ -242,6 +251,7 @@ class AgentRunner:
                 agent_key=agent_key,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                tools_used=tools_used,
             )
             final = await self._maybe_continue(
                 messages,
@@ -264,10 +274,16 @@ class AgentRunner:
         agent_key: str,
         temperature: float,
         max_tokens: int,
+        tools_used: bool = False,
     ) -> str:
         """Force a natural-language reply after tool observations."""
         finalize_messages = list(messages)
-        finalize_messages.append({"role": "system", "content": FINALIZE_USER_REPLY})
+        finalize_messages.append(
+            {
+                "role": "system",
+                "content": build_finalize_prompt(has_tool_results=tools_used),
+            }
+        )
         try:
             result = await llm_client.chat_completion(
                 finalize_messages,
