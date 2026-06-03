@@ -14,10 +14,6 @@ from src.agents_tg.services.prompts.behavior import (
     WEB_TOOL_HINT,
     build_finalize_prompt,
 )
-from src.agents_tg.services.prompts.proactive import (
-    HEARTBEAT_WAKE_PROMPT,
-    MORNING_DIGEST_PROMPT,
-)
 from src.agents_tg.services.prompts.identity import (
     human_name_for,
     load_soul,
@@ -30,10 +26,14 @@ from src.agents_tg.services.prompts.memory_block import (
     build_memory_block,
     build_scheduled_context,
 )
+from src.agents_tg.services.prompts.proactive import (
+    HEARTBEAT_WAKE_PROMPT,
+    MORNING_DIGEST_PROMPT,
+)
 from src.agents_tg.services.prompts.tier_rules import (
-    PromptTier,
     RESEARCH_ACTION_PATTERN,
     TASK_LIST_PATTERN,
+    PromptTier,
     detect_prompt_tier,
     light_goal_directive,
     tools_for_tier,

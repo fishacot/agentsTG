@@ -73,8 +73,12 @@ def register_commands(router: Router, bot: AgentBot) -> None:
             return
         from src.agents_tg.services.user_tasks_service import user_tasks_service
 
-        tasks = await user_tasks_service.list_tasks(telegram_user_id=message.from_user.id)
-        pending = [t for t in (tasks.get("tasks") or []) if t.get("status") == "pending"]
+        tasks = await user_tasks_service.list_tasks(
+            telegram_user_id=message.from_user.id
+        )
+        pending = [
+            t for t in (tasks.get("tasks") or []) if t.get("status") == "pending"
+        ]
         if not pending:
             await message.answer("Нет активных задач.")
             return

@@ -10,7 +10,7 @@ from src.agents_tg.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_ALLOWLIST = frozenset({"echo", "ping"})
+_DEFAULT_ALLOWLIST = frozenset({"echo", "ping", "read_file", "list_directory"})
 
 
 class MCPClient:

@@ -52,12 +52,16 @@ class UserContactService:
                 chat_id=chat_id,
                 agent_key=agent_key,
                 last_inbound_at=now,
-                last_outbound_at=self._memory.get(key).last_outbound_at
-                if key in self._memory
-                else None,
-                last_heartbeat_at=self._memory.get(key).last_heartbeat_at
-                if key in self._memory
-                else None,
+                last_outbound_at=(
+                    self._memory.get(key).last_outbound_at
+                    if key in self._memory
+                    else None
+                ),
+                last_heartbeat_at=(
+                    self._memory.get(key).last_heartbeat_at
+                    if key in self._memory
+                    else None
+                ),
             )
 
     async def record_outbound(

@@ -17,12 +17,15 @@ async def test_deep_research_merges_results() -> None:
         {"url": "https://a.com", "ok": True, "content": "Full content A"},
     ]
 
-    with patch(
-        "src.agents_tg.services.search_provider.web_search",
-        new=AsyncMock(return_value=search_rows),
-    ), patch(
-        "src.agents_tg.services.search_provider.fetch_multiple_pages",
-        new=AsyncMock(return_value=pages),
+    with (
+        patch(
+            "src.agents_tg.services.search_provider.web_search",
+            new=AsyncMock(return_value=search_rows),
+        ),
+        patch(
+            "src.agents_tg.services.search_provider.fetch_multiple_pages",
+            new=AsyncMock(return_value=pages),
+        ),
     ):
         result = await deep_research("test query")
 

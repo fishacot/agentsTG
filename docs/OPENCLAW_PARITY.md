@@ -36,7 +36,7 @@
 | Task Brain / agent_jobs | `gateway/job_store.py` + PG | done |
 | Idempotency | gateway dispatch + job_store | done |
 | HTTP agent/run | `health_server.py` POST `/v1/agent/run` | done |
-| A2A callback | POST `/v1/webhook/a2a/callback` | done (stub) |
+| A2A callback | POST `/v1/webhook/a2a/callback` + plan step resume | partial (in-process plan only) |
 | GET /v1/models stub | `health_server.py` | partial |
 | WS / OpenAI-compat API | — | backlog |
 
@@ -77,7 +77,7 @@
 |-------|----------|--------|
 | Plan executor | `plan_executor.py` + LangGraph loop | done |
 | Outer loop / max turns | `agent_outer_loop.py` + replan suffix | done |
-| Progress UX | `progress_ux.py` + plan_executor | done |
+| Progress UX | `progress_ux.py` + `plan_progress.py` (editMessage) | done |
 | Verify-lite | `verify_step.py` | done |
 | Artifacts sendDocument | `artifact_service.py` + workspace register | done |
 | Confirmation TG buttons | `confirmation_service` + callbacks | done |
@@ -90,7 +90,7 @@
 | SOUL.md | `agents/souls/*.md` | done |
 | per-agent workspace | `workspace/users/{id}/agents/{role}/` | done |
 | JOURNAL.md | `append_journal_md` + `/journal` | done |
-| Confirmation gates | PG + `REQUIRE_CONFIRM` | partial |
+| Confirmation gates | PG + `REQUIRE_CONFIRM` + callback replay + `OutboundSink` inline | done (prod: `REQUIRE_CONFIRM=true` + E2E D6) |
 
 ## L4 Execution
 
@@ -107,7 +107,7 @@
 |----------|----------|--------|
 | 7 separate bots | unchanged | done |
 | Gateway envelope layer | `agent_bot → gateway → dispatch` | done |
-| delegation | PlanExecutor + orchestrator graph | partial |
+| delegation | `DelegationEnvelope` + PlanExecutor + DM/group orchestrator | partial |
 
 ## Ops
 

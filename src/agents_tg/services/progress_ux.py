@@ -31,6 +31,25 @@ def format_step_done(current: int, total: int) -> str:
     return f"✅ Шаг {current}/{total} готов."
 
 
+def cancel_keyboard(task_id: str) -> dict:
+    """Inline keyboard to cancel a running plan task."""
+    return {
+        "inline_keyboard": [
+            [{"text": "⏹ Отменить", "callback_data": f"plan_cancel:{task_id}"}]
+        ]
+    }
+
+
+def format_handoff(*, from_agent: str, to_agent: str, instruction: str) -> str:
+    """User-visible delegation handoff line."""
+    src = agent_display_name(from_agent)
+    dst = agent_display_name(to_agent)
+    preview = (instruction or "").strip()[:120]
+    if len((instruction or "").strip()) > 120:
+        preview += "…"
+    return f"↪️ <b>{src}</b> передаю <b>{dst}</b>: {preview}"
+
+
 def strip_supervisor_json_leak(text: str) -> str:
     """Hide raw supervisor JSON from user-visible replies."""
     t = (text or "").strip()

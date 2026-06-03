@@ -42,9 +42,7 @@ async def _run_subprocess(script_path: str, *, timeout_sec: int) -> dict[str, st
         stderr=asyncio.subprocess.PIPE,
     )
     try:
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), timeout=timeout_sec
-        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_sec)
     except asyncio.TimeoutError:
         proc.kill()
         return {"ok": "false", "error": f"timeout after {timeout_sec}s"}
@@ -61,9 +59,7 @@ async def _run_subprocess(script_path: str, *, timeout_sec: int) -> dict[str, st
     }
 
 
-async def _run_docker(
-    code: str, *, timeout_sec: int, image: str
-) -> dict[str, str]:
+async def _run_docker(code: str, *, timeout_sec: int, image: str) -> dict[str, str]:
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".py", delete=False, encoding="utf-8"
     ) as f:

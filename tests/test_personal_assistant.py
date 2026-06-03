@@ -14,9 +14,7 @@ def pa(tmp_path, monkeypatch) -> PersonalAssistant:
 @pytest.mark.asyncio
 async def test_add_and_list_tasks(pa: PersonalAssistant) -> None:
     uid = 12345
-    data = await pa.add_task(
-        "Купить молоко", due_date="завтра", telegram_user_id=uid
-    )
+    data = await pa.add_task("Купить молоко", due_date="завтра", telegram_user_id=uid)
     assert data["ok"] is True
     assert data["title"] == "Купить молоко"
     listing = await pa.list_tasks(telegram_user_id=uid)

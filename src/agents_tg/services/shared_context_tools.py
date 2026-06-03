@@ -110,7 +110,7 @@ def update_project_status_tool() -> AgentTool:
         if confirmation_service.requires_confirmation(action):
             confirmed = kwargs.get("confirmed") is True
             if not confirmed:
-                confirmation_service.register(
+                entry = await confirmation_service.register_and_persist(
                     telegram_user_id=uid,
                     action=action,
                     payload={"status": status, "project_id": kwargs.get("project_id")},
@@ -119,6 +119,8 @@ def update_project_status_tool() -> AgentTool:
                     ok=False,
                     needs_confirmation=True,
                     action=action,
+                    confirmation_token=entry.token,
+                    inline_keyboard=confirmation_service.inline_keyboard(entry.token),
                     hint=confirmation_service.hint_for_action(action),
                 )
         result = await shared_context.update_project_status(
@@ -206,7 +208,13 @@ def shared_context_tools(*, agent_key: str) -> list[AgentTool]:
         update_project_status_tool(),
     ]
     if agent_key in ("orchestrator", "personal_assistant"):
+        from src.agents_tg.services.tools.notebook_tools import append_notebook_tool
+
         tools.extend(
-            [update_user_profile_tool(), set_active_project_tool(agent_key)]
+            [
+                update_user_profile_tool(),
+                set_active_project_tool(agent_key),
+                append_notebook_tool(agent_key),
+            ]
         )
     return tools

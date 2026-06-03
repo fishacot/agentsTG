@@ -74,7 +74,10 @@ def send_telegram_message_tool() -> AgentTool:
         parameters={
             "type": "object",
             "properties": {
-                "text": {"type": "string", "description": "Текст для пользователя (HTML)"},
+                "text": {
+                    "type": "string",
+                    "description": "Текст для пользователя (HTML)",
+                },
             },
             "required": ["text"],
         },
@@ -131,6 +134,9 @@ def deep_research_tool() -> AgentTool:
         if isinstance(extra, str):
             extra = [extra]
         data = await deep_research(query, extra_queries=list(extra)[:2])
+        if data.get("ok") and data.get("citations"):
+            data = dict(data)
+            data["citation_block"] = data["citations"]
         return tool_result(**data)
 
     return AgentTool(

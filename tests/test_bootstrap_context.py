@@ -35,9 +35,7 @@ async def test_user_block_light_with_name(svc: SharedContextService):
 @pytest.mark.asyncio
 async def test_focus_block_with_project(svc: SharedContextService):
     await svc.set_active_project(1, title="Сайт о собаках")
-    await svc.log_activity(
-        1, agent_key="coder", summary="HTML главной", kind="code"
-    )
+    await svc.log_activity(1, agent_key="coder", summary="HTML главной", kind="code")
     block = await build_focus_block(1, tier=PromptTier.STANDARD)
     assert "Сайт о собаках" in block
     assert "HTML" in block or "coder" in block.lower() or "Руслан" in block

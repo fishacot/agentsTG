@@ -49,7 +49,9 @@ def test_light_tier_no_tools():
 
 def test_standard_tier_remember_only_by_default():
     tools = [
-        AgentTool(name="remember_about_user", description="d", parameters={}, handler=_dummy),
+        AgentTool(
+            name="remember_about_user", description="d", parameters={}, handler=_dummy
+        ),
         AgentTool(name="list_tasks", description="d", parameters={}, handler=_dummy),
         AgentTool(name="add_task", description="d", parameters={}, handler=_dummy),
     ]
@@ -59,7 +61,9 @@ def test_standard_tier_remember_only_by_default():
 
 def test_standard_tier_list_tasks_when_asked():
     tools = [
-        AgentTool(name="remember_about_user", description="d", parameters={}, handler=_dummy),
+        AgentTool(
+            name="remember_about_user", description="d", parameters={}, handler=_dummy
+        ),
         AgentTool(name="list_tasks", description="d", parameters={}, handler=_dummy),
     ]
     active = tools_for_tier(tools, PromptTier.STANDARD, "покажи мои дела")
@@ -68,8 +72,12 @@ def test_standard_tier_list_tasks_when_asked():
 
 def test_standard_tier_schedule_reminder():
     tools = [
-        AgentTool(name="remember_about_user", description="d", parameters={}, handler=_dummy),
-        AgentTool(name="schedule_reminder", description="d", parameters={}, handler=_dummy),
+        AgentTool(
+            name="remember_about_user", description="d", parameters={}, handler=_dummy
+        ),
+        AgentTool(
+            name="schedule_reminder", description="d", parameters={}, handler=_dummy
+        ),
     ]
     active = tools_for_tier(tools, PromptTier.STANDARD, "напомни завтра")
     assert {t.name for t in active} == {"remember_about_user", "schedule_reminder"}
@@ -77,7 +85,9 @@ def test_standard_tier_schedule_reminder():
 
 def test_web_standard_tier_no_deep_research():
     tools = [
-        AgentTool(name="remember_about_user", description="d", parameters={}, handler=_dummy),
+        AgentTool(
+            name="remember_about_user", description="d", parameters={}, handler=_dummy
+        ),
         AgentTool(name="deep_research", description="d", parameters={}, handler=_dummy),
     ]
     active = tools_for_tier(

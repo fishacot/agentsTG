@@ -1,10 +1,15 @@
-import logging
-from pathlib import Path
+"""Goal-oriented specialist agents (Manus-style)."""
 
-from src.agents_tg.services.agent_prompts import MANUS_SPECIALIST_STYLE
+from __future__ import annotations
+
 from src.agents_tg.services.agent_runner import agent_runner
-
-logger = logging.getLogger(__name__)
+from src.agents_tg.services.prompts.identity import load_soul
+from src.agents_tg.services.prompts.styles.business import BUSINESS_STYLE
+from src.agents_tg.services.prompts.styles.coder import CODER_STYLE
+from src.agents_tg.services.prompts.styles.marketing import MARKETING_STYLE
+from src.agents_tg.services.prompts.styles.research import RESEARCH_STYLE
+from src.agents_tg.services.prompts.styles.security import SECURITY_STYLE
+from src.agents_tg.services.prompts.styles.specialist import MANUS_SPECIALIST_STYLE
 
 DEFAULT_OUTPUT = (
     "Сформируй полезный ответ по специализации. "
@@ -39,6 +44,14 @@ CODER_OUTPUT = (
     "<b>Edge cases</b>. План правок — не выполняй сам."
 )
 
+ROLE_STYLES: dict[str, str] = {
+    "research": RESEARCH_STYLE,
+    "security_ai": SECURITY_STYLE,
+    "coder": CODER_STYLE,
+    "business_manager": BUSINESS_STYLE,
+    "marketing": MARKETING_STYLE,
+}
+
 
 class GoalOrientedAgent:
     """Specialist agent: natural dialogue + deep_research when needed."""
@@ -46,17 +59,17 @@ class GoalOrientedAgent:
     def __init__(
         self,
         agent_key: str,
-        soul_file: str,
+        soul_file: str | None = None,
         output_hints: str = DEFAULT_OUTPUT,
+        role_style: str | None = None,
     ) -> None:
         self.agent_key = agent_key
-        self.soul_path = Path(__file__).parent / "souls" / soul_file
+        self.soul_file = soul_file
         self.output_hints = output_hints
+        self.role_style = role_style or MANUS_SPECIALIST_STYLE
 
     def _load_soul(self) -> str:
-        if self.soul_path.exists():
-            return self.soul_path.read_text(encoding="utf-8")
-        return ""
+        return load_soul(self.agent_key, soul_file=self.soul_file)
 
     async def process(
         self,
@@ -68,7 +81,7 @@ class GoalOrientedAgent:
         from src.agents_tg.services.environment_context import AgentEnvironment
 
         env = environment if isinstance(environment, AgentEnvironment) else None
-        hints = f"{MANUS_SPECIALIST_STYLE}\n\n{self.output_hints}"
+        hints = f"{self.role_style}\n\n{self.output_hints}"
         return await agent_runner.run(
             agent_key=self.agent_key,
             soul=self._load_soul(),
@@ -85,22 +98,25 @@ class GoalOrientedAgent:
 
 research_analyst = GoalOrientedAgent(
     agent_key="research",
-    soul_file="sports_analyst.md",
+    role_style=RESEARCH_STYLE,
     output_hints=RESEARCH_OUTPUT,
 )
 security_ai = GoalOrientedAgent(
     agent_key="security_ai",
     soul_file="security_ai.md",
+    role_style=SECURITY_STYLE,
     output_hints=SECURITY_OUTPUT,
 )
 business_manager = GoalOrientedAgent(
     agent_key="business_manager",
     soul_file="business_manager.md",
+    role_style=BUSINESS_STYLE,
     output_hints=BUSINESS_OUTPUT,
 )
 marketing = GoalOrientedAgent(
     agent_key="marketing",
     soul_file="marketing.md",
+    role_style=MARKETING_STYLE,
     output_hints=MARKETING_OUTPUT,
 )
 general = GoalOrientedAgent(
@@ -111,5 +127,17 @@ general = GoalOrientedAgent(
 coder = GoalOrientedAgent(
     agent_key="coder",
     soul_file="coder_soul.md",
+    role_style=CODER_STYLE,
     output_hints=CODER_OUTPUT,
 )
+
+__all__ = [
+    "GoalOrientedAgent",
+    "ROLE_STYLES",
+    "business_manager",
+    "coder",
+    "general",
+    "marketing",
+    "research_analyst",
+    "security_ai",
+]

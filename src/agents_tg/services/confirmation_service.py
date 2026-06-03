@@ -20,6 +20,7 @@ GATED_ACTIONS = frozenset(
         "update_project_status:done",
         "deploy_hook",
         "delete_data",
+        "run_code",
     }
 )
 
@@ -48,6 +49,11 @@ class ConfirmationService:
             return False
         return action in GATED_ACTIONS
 
+    def _is_expired(self, entry: PendingConfirmation) -> bool:
+        ttl = int(get_settings().CONFIRMATION_TTL_SEC)
+        age = (datetime.now(timezone.utc) - entry.created_at).total_seconds()
+        return age > ttl
+
     def register(
         self,
         *,
@@ -71,6 +77,21 @@ class ConfirmationService:
         )
         return entry
 
+    async def register_and_persist(
+        self,
+        *,
+        telegram_user_id: int,
+        action: str,
+        payload: dict[str, Any] | None = None,
+    ) -> PendingConfirmation:
+        entry = self.register(
+            telegram_user_id=telegram_user_id,
+            action=action,
+            payload=payload,
+        )
+        await self.persist_register(entry)
+        return entry
+
     async def persist_register(self, entry: PendingConfirmation) -> None:
         if not self._engine:
             return
@@ -90,10 +111,17 @@ class ConfirmationService:
             logger.warning("PG confirmation persist failed: %s", exc)
 
     def get(self, token: str) -> PendingConfirmation | None:
-        return self._pending.get(token)
+        entry = self._pending.get(token)
+        if entry and self._is_expired(entry):
+            self._pending.pop(token, None)
+            return None
+        return entry
 
     def consume(self, token: str) -> PendingConfirmation | None:
-        return self._pending.pop(token, None)
+        entry = self._pending.pop(token, None)
+        if entry and self._is_expired(entry):
+            return None
+        return entry
 
     async def persist_consume(self, token: str) -> None:
         if not self._engine:
@@ -103,9 +131,7 @@ class ConfirmationService:
 
             async with self._engine.begin() as conn:
                 await conn.execute(
-                    update(PC)
-                    .where(PC.token == token)
-                    .values(status="consumed")
+                    update(PC).where(PC.token == token).values(status="consumed")
                 )
         except Exception as exc:
             logger.warning("PG confirmation consume failed: %s", exc)

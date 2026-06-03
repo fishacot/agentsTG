@@ -27,7 +27,9 @@ def parse_reminder_when(text: str, *, base: datetime | None = None) -> datetime 
         return base_local + timedelta(hours=int(m.group(1)))
 
     # в HH:MM or в H
-    m = re.search(r"(?:в|at)\s*(\d{1,2})(?::(\d{2}))?\s*(?:утра|утром|дня|вечера|мск)?", raw)
+    m = re.search(
+        r"(?:в|at)\s*(\d{1,2})(?::(\d{2}))?\s*(?:утра|утром|дня|вечера|мск)?", raw
+    )
     if m:
         hour = int(m.group(1))
         minute = int(m.group(2) or 0)

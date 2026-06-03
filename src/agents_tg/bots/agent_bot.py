@@ -136,4 +136,6 @@ class AgentBot:
                 reply_to_message_id=reply_to,
             )
         except Exception as e:
-            logger.error("Failed to send message to group from %s: %s", self.agent_key, e)
+            logger.error(
+                "Failed to send message to group from %s: %s", self.agent_key, e
+            )

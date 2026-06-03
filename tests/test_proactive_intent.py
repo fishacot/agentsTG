@@ -10,9 +10,10 @@ from src.agents_tg.services.reminder_service import ReminderService
 
 
 def test_extract_daily_time_11_msk():
-    assert _extract_daily_time(
-        "каждый день в 11 утра по мск присылай доброе утро"
-    ) == (11, 0)
+    assert _extract_daily_time("каждый день в 11 утра по мск присылай доброе утро") == (
+        11,
+        0,
+    )
 
 
 def test_extract_daily_time_reversed_phrase():

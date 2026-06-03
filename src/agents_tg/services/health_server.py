@@ -72,6 +72,22 @@ def _parse_request(raw: bytes) -> tuple[str, str, dict[str, Any]]:
     return method, path, body
 
 
+def _check_api_token(headers_line: str) -> bool:
+    from src.agents_tg.config.settings import get_settings
+
+    settings = get_settings()
+    token = (settings.AGENT_RUN_API_TOKEN or "").strip()
+    if not token:
+        return bool(settings.DEBUG)
+    for line in headers_line.split("\r\n"):
+        if line.lower().startswith("authorization:"):
+            value = line.split(":", 1)[1].strip()
+            if value.lower().startswith("bearer "):
+                return value[7:].strip() == token
+            return value == token
+    return False
+
+
 async def _handle_agent_run(body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     from src.agents_tg.gateway.envelope import OpenClawEnvelope
     from src.agents_tg.gateway.router import gateway_router
@@ -105,7 +121,9 @@ async def _handle_a2a_callback(body: dict[str, Any]) -> tuple[int, dict[str, Any
     return code, payload
 
 
-async def _handle_request(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+async def _handle_request(
+    reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+) -> None:
     try:
         raw = await reader.readuntil(b"\r\n\r\n")
         content_length = 0
@@ -116,19 +134,47 @@ async def _handle_request(reader: asyncio.StreamReader, writer: asyncio.StreamWr
         if content_length > 0:
             body_bytes = await reader.readexactly(content_length)
         method, path, body = _parse_request(raw + body_bytes)
+        headers_text = raw.decode("utf-8", errors="replace")
 
         status_code = 200
+        if method == "POST" and path in ("/v1/agent/run", "/v1/webhook/a2a/callback"):
+            if not _check_api_token(headers_text):
+                status_code = 401
+                response_body = b'{"error":"unauthorized"}\n'
+                writer.write(
+                    f"HTTP/1.1 {status_code} Unauthorized\r\n"
+                    f"Content-Type: application/json\r\n"
+                    f"Content-Length: {len(response_body)}\r\n\r\n".encode()
+                    + response_body
+                )
+                await writer.drain()
+                writer.close()
+                await writer.wait_closed()
+                return
         if method == "GET" and path in ("/", "/health", "/healthz"):
             response_body = await _build_health_body()
         elif method == "GET" and path == "/v1/models":
+            from src.agents_tg.config.settings import get_settings
+
+            s = get_settings()
             models_body = {
                 "object": "list",
                 "data": [
                     {
-                        "id": "agents-tg-orchestrator",
+                        "id": s.get_agent_model(key),
                         "object": "model",
                         "owned_by": "agents-tg",
+                        "agent_key": key,
                     }
+                    for key in (
+                        "orchestrator",
+                        "personal_assistant",
+                        "coder",
+                        "research",
+                        "security_ai",
+                        "business_manager",
+                        "marketing",
+                    )
                 ],
             }
             response_body = (
@@ -144,7 +190,11 @@ async def _handle_request(reader: asyncio.StreamReader, writer: asyncio.StreamWr
             status_code = 404
             response_body = b'{"error":"not found"}\n'
 
-        reason = "OK" if status_code == 200 else "Not Found" if status_code == 404 else "Bad Request"
+        reason = (
+            "OK"
+            if status_code == 200
+            else "Not Found" if status_code == 404 else "Bad Request"
+        )
         response = (
             f"HTTP/1.1 {status_code} {reason}\r\n"
             "Content-Type: application/json\r\n"

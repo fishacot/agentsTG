@@ -32,7 +32,9 @@ class ChatHistoryStore:
     def set_pg_available(self, available: bool) -> None:
         self._pg_available = available
 
-    def _key(self, user_id: str, agent_key: str) -> str:
+    def _key(self, user_id: str, agent_key: str, task_id: str | None = None) -> str:
+        if task_id:
+            return f"chat:{user_id}:{agent_key}:task:{task_id}"
         return f"chat:{user_id}:{agent_key}"
 
     async def _get_redis(self) -> Any | None:
@@ -63,12 +65,14 @@ class ChatHistoryStore:
         agent_key: str,
         role: str,
         content: str,
+        *,
+        task_id: str | None = None,
     ) -> None:
         text = (content or "")[:MAX_MESSAGE_LEN]
         if not text:
             return
         turn = ChatTurn(role=role, content=text)
-        key = self._key(user_id, agent_key)
+        key = self._key(user_id, agent_key, task_id)
 
         if key not in self._memory:
             self._memory[key] = deque(maxlen=MAX_TURNS * 2)
@@ -77,7 +81,9 @@ class ChatHistoryStore:
         redis = await self._get_redis()
         if redis:
             try:
-                payload = json.dumps({"role": role, "content": text}, ensure_ascii=False)
+                payload = json.dumps(
+                    {"role": role, "content": text}, ensure_ascii=False
+                )
                 await redis.rpush(key, payload)
                 await redis.ltrim(key, -MAX_TURNS * 2, -1)
             except Exception as exc:
@@ -92,6 +98,7 @@ class ChatHistoryStore:
                     agent_key=agent_key,
                     role=role,
                     content=text,
+                    task_id=task_id,
                 )
             except Exception as exc:
                 logger.warning("Postgres chat history append failed: %s", exc)
@@ -101,8 +108,10 @@ class ChatHistoryStore:
         user_id: str,
         agent_key: str,
         limit: int = MAX_TURNS,
+        *,
+        task_id: str | None = None,
     ) -> list[ChatTurn]:
-        key = self._key(user_id, agent_key)
+        key = self._key(user_id, agent_key, task_id)
         redis = await self._get_redis()
         if redis:
             try:
@@ -126,6 +135,7 @@ class ChatHistoryStore:
                     telegram_user_id=int(user_id),
                     agent_key=agent_key,
                     limit=limit * 2,
+                    task_id=task_id,
                 )
             except Exception as exc:
                 logger.debug("Postgres chat history read failed: %s", exc)

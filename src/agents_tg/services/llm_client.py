@@ -107,7 +107,17 @@ class GroqProvider(_ProviderBase):
             )
         return self._session
 
-    async def chat_completion(self, messages, *, temperature, max_tokens, model, tools, tool_choice, response_format=None):
+    async def chat_completion(
+        self,
+        messages,
+        *,
+        temperature,
+        max_tokens,
+        model,
+        tools,
+        tool_choice,
+        response_format=None,
+    ):
         payload: dict[str, Any] = {
             "model": model,
             "messages": messages,
@@ -119,7 +129,9 @@ class GroqProvider(_ProviderBase):
             payload["tool_choice"] = tool_choice if tool_choice is not None else "auto"
         if response_format:
             payload["response_format"] = response_format
-        raw = await _post_with_retry(self.api_base, payload, session=await self._session_client())
+        raw = await _post_with_retry(
+            self.api_base, payload, session=await self._session_client()
+        )
         return _extract_message(raw)
 
 
@@ -149,7 +161,17 @@ class GeminiProvider(_ProviderBase):
             )
         return self._session
 
-    async def chat_completion(self, messages, *, temperature, max_tokens, model, tools, tool_choice, response_format=None):
+    async def chat_completion(
+        self,
+        messages,
+        *,
+        temperature,
+        max_tokens,
+        model,
+        tools,
+        tool_choice,
+        response_format=None,
+    ):
         url = f"{self.api_base}/chat/completions"
         payload: dict[str, Any] = {
             "model": model,
@@ -192,7 +214,17 @@ class HuggingFaceProvider(_ProviderBase):
             )
         return self._session
 
-    async def chat_completion(self, messages, *, temperature, max_tokens, model, tools, tool_choice, response_format=None):
+    async def chat_completion(
+        self,
+        messages,
+        *,
+        temperature,
+        max_tokens,
+        model,
+        tools,
+        tool_choice,
+        response_format=None,
+    ):
         payload: dict[str, Any] = {
             "model": model,
             "messages": messages,
@@ -202,7 +234,9 @@ class HuggingFaceProvider(_ProviderBase):
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = tool_choice if tool_choice is not None else "auto"
-        raw = await _post_with_retry(self.api_base, payload, session=await self._session_client())
+        raw = await _post_with_retry(
+            self.api_base, payload, session=await self._session_client()
+        )
         return _extract_message(raw)
 
 
@@ -366,16 +400,43 @@ class LLMClient:
     ) -> dict[str, Any]:
         chain = self._chain()
         if not chain:
-            raise QwenAPIError("No LLM provider configured (set GEMINI_API_KEY or GROQ_API_KEY)")
+            raise QwenAPIError(
+                "No LLM provider configured (set GEMINI_API_KEY or GROQ_API_KEY)"
+            )
+
+        from src.agents_tg.services.llm_budget import llm_budget
+        from src.agents_tg.services.llm_context import get_llm_user_id
+
+        budget_uid = get_llm_user_id()
+        if await llm_budget.is_exhausted(budget_uid):
+            raise RateLimitError(
+                "Daily LLM soft budget exhausted",
+                status=429,
+                retryable=True,
+            )
+
+        from src.agents_tg.services.llm_context import get_llm_step_kind
+        from src.agents_tg.services.llm_step_routing import resolve_step_model
+
+        routed_model = model
+        if not routed_model:
+            override = resolve_step_model(
+                get_llm_step_kind(),
+                agent_key=agent_key,
+            )
+            if override:
+                routed_model = override
 
         errors: list[str] = []
         sem = _semaphore_for_agent(agent_key)
         async with sem:
             for idx, provider in enumerate(chain):
-                resolved = model or self.model_for_agent(agent_key or "", provider.name)
+                resolved = routed_model or self.model_for_agent(
+                    agent_key or "", provider.name
+                )
                 has_next = idx < len(chain) - 1
                 try:
-                    return await provider.chat_completion(
+                    result = await provider.chat_completion(
                         messages,
                         temperature=temperature,
                         max_tokens=max_tokens,
@@ -384,9 +445,13 @@ class LLMClient:
                         tool_choice=tool_choice,
                         response_format=response_format,
                     )
+                    await llm_budget.record(budget_uid)
+                    return result
                 except RateLimitError as exc:
                     errors.append(f"{provider.name}:{exc.status or 429}")
-                    logger.warning("Provider %s rate limited, trying next", provider.name)
+                    logger.warning(
+                        "Provider %s rate limited, trying next", provider.name
+                    )
                     continue
                 except QwenAPIError as exc:
                     errors.append(f"{provider.name}:{exc.status}")

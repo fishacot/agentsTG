@@ -72,7 +72,9 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_user_projects_telegram_user_id", "user_projects", ["telegram_user_id"])
+    op.create_index(
+        "ix_user_projects_telegram_user_id", "user_projects", ["telegram_user_id"]
+    )
     op.create_index("ix_user_projects_status", "user_projects", ["status"])
 
     op.create_table(
@@ -92,7 +94,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["project_id"], ["user_projects.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_project_activity_project_id", "project_activity", ["project_id"])
+    op.create_index(
+        "ix_project_activity_project_id", "project_activity", ["project_id"]
+    )
     op.create_index(
         "ix_project_activity_telegram_user_id", "project_activity", ["telegram_user_id"]
     )

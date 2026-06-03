@@ -30,7 +30,9 @@ async def post_to_notes_channel(title: str, body: str) -> dict:
 
     bot = Bot(token=token, default=DefaultBotProperties())
     try:
-        msg = await bot.send_message(chat_id=channel_id, text=text[:4096], parse_mode="HTML")
+        msg = await bot.send_message(
+            chat_id=channel_id, text=text[:4096], parse_mode="HTML"
+        )
         return {
             "ok": True,
             "channel_id": channel_id,

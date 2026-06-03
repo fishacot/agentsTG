@@ -120,7 +120,9 @@ class MessagePipeline:
         self._followups[key].append(
             _FollowupItem(message=message, handler=handler, combined_text=combined_text)
         )
-        logger.debug("Followup queued for %s (depth=%s)", key, len(self._followups[key]))
+        logger.debug(
+            "Followup queued for %s (depth=%s)", key, len(self._followups[key])
+        )
 
     async def drain_followups(self, agent_key: str, chat_id: int) -> None:
         """Process one queued followup after current run completes."""

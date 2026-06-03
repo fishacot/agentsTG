@@ -273,6 +273,4 @@ async def handle_message(message: Message, state: FSMContext) -> None:
         await thinking_msg.edit_text(response)
     except Exception as e:
         logger.error("Error processing message: %s", e)
-        await thinking_msg.edit_text(
-            "😕 Извини, произошла ошибка. Попробуй ещё раз."
-        )
+        await thinking_msg.edit_text("😕 Извини, произошла ошибка. Попробуй ещё раз.")

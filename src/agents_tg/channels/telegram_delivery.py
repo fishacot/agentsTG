@@ -114,10 +114,16 @@ async def _send_one(
     reply_in_group: bool,
     thinking_message: Message | None,
     use_thinking_edit: bool,
+    reply_markup: dict | None = None,
+    reply_to_message_id: int | None = None,
 ) -> Message:
     kwargs: dict = {}
     if parse_mode:
         kwargs["parse_mode"] = parse_mode
+    if reply_markup:
+        kwargs["reply_markup"] = reply_markup
+    if reply_to_message_id:
+        kwargs["reply_to_message_id"] = reply_to_message_id
 
     if reply_in_group:
         if thinking_message and use_thinking_edit:
@@ -136,6 +142,8 @@ async def _send_with_retry(
     reply_in_group: bool,
     thinking_message: Message | None,
     use_thinking_edit: bool,
+    reply_markup: dict | None = None,
+    reply_to_message_id: int | None = None,
 ) -> Message | None:
     safe = sanitize_html_for_telegram(content)
     for attempt in range(2):
@@ -147,6 +155,8 @@ async def _send_with_retry(
                 reply_in_group=reply_in_group,
                 thinking_message=thinking_message,
                 use_thinking_edit=use_thinking_edit,
+                reply_markup=reply_markup,
+                reply_to_message_id=reply_to_message_id,
             )
         except TelegramBadRequest as exc:
             logger.warning("HTML send failed (attempt %s): %s", attempt + 1, exc)
@@ -159,6 +169,8 @@ async def _send_with_retry(
                     reply_in_group=reply_in_group,
                     thinking_message=thinking_message,
                     use_thinking_edit=use_thinking_edit,
+                    reply_markup=reply_markup,
+                    reply_to_message_id=reply_to_message_id,
                 )
             except TelegramBadRequest:
                 if attempt == 1:
@@ -173,6 +185,8 @@ async def send_agent_response(
     reply_in_group: bool = False,
     thinking_message: Message | None = None,
     chunk_limit: int = 4096,
+    reply_markup: dict | None = None,
+    reply_to_message_id: int | None = None,
 ) -> Message | None:
     """Send agent reply; split long text into numbered parts."""
     import asyncio
@@ -193,6 +207,8 @@ async def send_agent_response(
             await asyncio.sleep(delay_ms / 1000.0)
         body = _part_prefix(i, total) + part
         use_edit = i == 1 and thinking_message is not None
+        part_markup = reply_markup if i == total else None
+        part_reply_to = reply_to_message_id if i == 1 else None
         try:
             last_sent = await _send_with_retry(
                 message,
@@ -200,6 +216,8 @@ async def send_agent_response(
                 reply_in_group=reply_in_group,
                 thinking_message=thinking_message if use_edit else None,
                 use_thinking_edit=use_edit,
+                reply_markup=part_markup,
+                reply_to_message_id=part_reply_to,
             )
         except TelegramBadRequest as exc:
             logger.error("Failed to send part %s/%s: %s", i, total, exc)

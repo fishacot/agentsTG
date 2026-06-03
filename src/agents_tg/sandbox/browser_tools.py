@@ -1,4 +1,7 @@
-"""Browser tools — httpx fetch with retry and title extraction."""
+"""Browser tools — httpx static fetch (no JS render).
+
+For SPAs use deep_research or another source; replan if extracted_text is empty.
+"""
 
 from __future__ import annotations
 
@@ -47,6 +50,8 @@ async def browser_navigate(url: str) -> dict[str, Any]:
         resp = await _fetch(url)
         text = resp.text[:_MAX_BYTES]
         title = _extract_title(text)
+        extracted = re.sub(r"<[^>]+>", " ", text)
+        extracted = re.sub(r"\s+", " ", extracted).strip()[:4000]
         return {
             "ok": True,
             "url": str(resp.url),
@@ -54,6 +59,7 @@ async def browser_navigate(url: str) -> dict[str, Any]:
             "content_type": resp.headers.get("content-type", ""),
             "title": title,
             "text_preview": text[:2000],
+            "extracted_text": extracted,
         }
     except Exception as exc:
         logger.warning("browser_navigate failed: %s", exc)
@@ -68,6 +74,8 @@ async def browser_snapshot(url: str) -> dict[str, Any]:
     return {
         "ok": True,
         "url": result.get("url"),
+        "status_code": result.get("status_code"),
         "title": result.get("title", ""),
         "snapshot": result.get("text_preview", "")[:8000],
+        "extracted_text": result.get("extracted_text", "")[:8000],
     }

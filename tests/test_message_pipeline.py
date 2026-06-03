@@ -32,7 +32,9 @@ async def test_followup_queue_while_busy():
 
     msg = Msg()
     pipe._busy["coder:42"] = True
-    pipe.queue_followup(agent_key="coder", message=msg, handler=handler, combined_text="queued")
+    pipe.queue_followup(
+        agent_key="coder", message=msg, handler=handler, combined_text="queued"
+    )
     pipe._busy["coder:42"] = False
     await pipe.drain_followups("coder", 42)
     assert processed == ["queued"]

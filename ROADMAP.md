@@ -1,8 +1,11 @@
 # Roadmap: AI Agents Telegram Assistant — Production Ready
 
-> План развития от MVP к production-grade системе
-> Создан: 2026-05-26
-> Текущий статус: MVP (6/10), базовая архитектура работает
+> **Актуальный многомесячный план MVP «личный штаб»:** [`docs/ROADMAP_MVP.md`](docs/ROADMAP_MVP.md)  
+> Этот файл — исторический пошаговый план (2026-05-26). Пункты про Chroma/RAG ниже — **post-MVP / optional**, не блокируют текущий MVP.
+
+> План развития от MVP к production-grade системе  
+> Создан: 2026-05-26  
+> Текущий статус: скелет 7 ботов + gateway + plan_executor (см. OPENCLAW_PARITY)
 
 ---
 

@@ -50,11 +50,13 @@ class AgentOuterLoop:
                         "agent_key": agent_key,
                         "turn": turn + 1,
                         "status": "running",
-                        "action_type": "continue"
-                        if _CONTINUE_SUFFIX in (result or "")
-                        else "replan"
-                        if _REPLAN_SUFFIX in (result or "")
-                        else "step",
+                        "action_type": (
+                            "continue"
+                            if _CONTINUE_SUFFIX in (result or "")
+                            else (
+                                "replan" if _REPLAN_SUFFIX in (result or "") else "step"
+                            )
+                        ),
                     },
                 )
 

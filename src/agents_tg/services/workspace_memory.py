@@ -137,7 +137,11 @@ def load_heartbeat_md(telegram_user_id: int) -> str:
     """Load per-user HEARTBEAT checklist or repo default."""
     settings = get_settings()
     user_path = (
-        settings.ROOT_DIR / "workspace" / "users" / str(telegram_user_id) / "HEARTBEAT.md"
+        settings.ROOT_DIR
+        / "workspace"
+        / "users"
+        / str(telegram_user_id)
+        / "HEARTBEAT.md"
     )
     default_paths = (
         settings.ROOT_DIR / "workspace" / "HEARTBEAT.default.md",

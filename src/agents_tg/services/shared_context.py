@@ -172,7 +172,12 @@ class SharedContextService:
             status="active",
             updated_at=now,
         )
-        return {"id": pid, "title": title, "description": description, "status": "active"}
+        return {
+            "id": pid,
+            "title": title,
+            "description": description,
+            "status": "active",
+        }
 
     async def update_project_status(
         self,
@@ -355,7 +360,9 @@ class SharedContextService:
                         .values(**vals)
                     )
 
-    async def _get_active_project_pg(self, telegram_user_id: int) -> dict[str, Any] | None:
+    async def _get_active_project_pg(
+        self, telegram_user_id: int
+    ) -> dict[str, Any] | None:
         from sqlalchemy import select
 
         from src.agents_tg.db.models import UserProject

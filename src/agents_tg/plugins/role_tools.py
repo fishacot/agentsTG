@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from src.agents_tg.services.agent_runner import AgentTool, tool_result
-from src.agents_tg.services.plan_executor import plan_executor
 from src.agents_tg.sandbox.browser_tools import browser_navigate, browser_snapshot
 from src.agents_tg.sandbox.docker_runner import run_code
+from src.agents_tg.services.agent_runner import AgentTool, tool_result
+from src.agents_tg.services.plan_executor import plan_executor
 
 
 def delegate_task_tool() -> AgentTool:
@@ -87,7 +87,26 @@ def merge_results_tool() -> AgentTool:
 
 def run_code_tool() -> AgentTool:
     async def handler(**kwargs: Any) -> str:
+        from src.agents_tg.services.confirmation_service import confirmation_service
+
+        uid = int(str(kwargs.get("user_id") or kwargs.get("telegram_user_id") or 0))
         code = str(kwargs.get("code", ""))
+        action = "run_code"
+        if confirmation_service.requires_confirmation(action):
+            if kwargs.get("confirmed") is not True:
+                entry = await confirmation_service.register_and_persist(
+                    telegram_user_id=uid,
+                    action=action,
+                    payload={"code": code[:4000], "timeout_sec": 30},
+                )
+                return tool_result(
+                    ok=False,
+                    needs_confirmation=True,
+                    action=action,
+                    confirmation_token=entry.token,
+                    inline_keyboard=confirmation_service.inline_keyboard(entry.token),
+                    hint=confirmation_service.hint_for_action(action),
+                )
         result = await run_code(code, timeout_sec=30)
         return tool_result(**result)
 
@@ -205,9 +224,21 @@ def list_agent_workspace_tool() -> AgentTool:
 
 def role_tools_for_agent(agent_key: str) -> list[AgentTool]:
     """Return P0 role tools for agent_key."""
+    from src.agents_tg.services.tools.integration_tools import (
+        calendar_create_event_tool,
+        github_list_issues_tool,
+        staff_summary_tool,
+    )
+
     mapping: dict[str, list] = {
-        "orchestrator": [delegate_task_tool, track_progress_tool, merge_results_tool],
-        "coder": [run_code_tool, lint_test_tool],
+        "orchestrator": [
+            delegate_task_tool,
+            track_progress_tool,
+            merge_results_tool,
+            staff_summary_tool,
+        ],
+        "personal_assistant": [calendar_create_event_tool],
+        "coder": [run_code_tool, lint_test_tool, github_list_issues_tool],
         "research": [browser_navigate_tool, browser_snapshot_tool],
         "security_ai": [scan_prompt_tool],
     }

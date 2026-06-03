@@ -99,6 +99,12 @@ class AppSettings(BaseSettings):
     HEALTH_PORT: int = 8080
     MESSAGE_DEBOUNCE_MS: int = 2000
     LLM_COOLDOWN_SEC: float = 3.0
+    LLM_SOFT_DAILY_CALLS: int = 80
+    GROQ_DEFER_HEAVY_ON_BUDGET: bool = True
+    MAX_PLAN_STEPS: int = 4
+    PLAN_MAX_STEPS: int = 4  # alias for MAX_PLAN_STEPS (guardrails doc)
+    PREFER_FILE_MEMORY: bool = True
+    NOTEBOOK_MAX_CHARS: int = 1500
 
     # Proactive agent wake (OpenClaw heartbeat parity)
     HEARTBEAT_ENABLED: bool = True
@@ -116,6 +122,10 @@ class AppSettings(BaseSettings):
 
     # Manus-style confirmation gates for destructive actions
     REQUIRE_CONFIRM: bool = False
+    CONFIRMATION_TTL_SEC: int = 60
+
+    # Optional LLM judge after heuristic verify (expensive)
+    VERIFY_LLM_JUDGE: bool = False
 
     # Manus outer loop
     MAX_AGENT_TURNS: int = 15
@@ -132,6 +142,19 @@ class AppSettings(BaseSettings):
     SANDBOX_REQUIRED: bool = True
     SANDBOX_MODE: str = "subprocess"  # subprocess | docker
     SANDBOX_DOCKER_IMAGE: str = "python:3.11-slim"
+
+    # Integrations (phase 2 MVP)
+    CALDAV_URL: str = ""
+    GITHUB_TOKEN: str = ""
+
+    # HTTP API auth (phase 4)
+    AGENT_RUN_API_TOKEN: str = ""
+
+    # Optional per-step model routing JSON: {"classify":"model","finalize":"model"}
+    STEP_MODEL_ROUTING: str = ""
+
+    # Cost guardrails
+    MAX_TOKENS_FULL_TIER: int = 900
 
     # MCP (OpenClaw parity, off by default)
     MCP_ENABLED: bool = False

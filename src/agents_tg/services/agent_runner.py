@@ -6,7 +6,6 @@ import logging
 from typing import Any
 
 from src.agents_tg.services.agent_delivery_profile import get_delivery_profile
-from src.agents_tg.services.prompts.finalize_directives import build_finalize_prompt
 from src.agents_tg.services.agent_runtime import get_outbound_sink
 from src.agents_tg.services.chat_history import chat_history
 from src.agents_tg.services.environment_context import AgentEnvironment
@@ -19,6 +18,7 @@ from src.agents_tg.services.prompt_builder import (
     detect_prompt_tier,
     tools_for_tier,
 )
+from src.agents_tg.services.prompts.finalize_directives import build_finalize_prompt
 from src.agents_tg.services.prompts.identity import prompt_identity
 from src.agents_tg.services.tools.builtin import (
     AgentTool,
@@ -38,8 +38,7 @@ class AgentRunner:
 
     MAX_TOOL_ROUNDS = 1
     _RATE_LIMIT_REPLY = (
-        "⏳ Сейчас перегрузка AI (лимит Groq). "
-        "Подождите 15–30 секунд и повторите."
+        "⏳ Сейчас перегрузка AI (лимит Groq). " "Подождите 15–30 секунд и повторите."
     )
 
     async def run(
@@ -64,13 +63,20 @@ class AgentRunner:
         max_tool_rounds = max_tool_rounds_override or profile.max_tool_rounds
 
         tier = detect_prompt_tier(user_message, include_web_tools=include_web_tools)
+        from src.agents_tg.services.llm_budget import llm_budget
+
+        if await llm_budget.should_force_light_tier(user_id):
+            tier = PromptTier.LIGHT
         profile_cap = profile.max_tokens
+        from src.agents_tg.config.settings import get_settings
+
+        full_cap = int(getattr(get_settings(), "MAX_TOKENS_FULL_TIER", 900) or 900)
         if tier == PromptTier.LIGHT:
             max_tokens = min(max_tokens, profile_cap, 512)
         elif tier == PromptTier.STANDARD:
             max_tokens = min(max_tokens, profile_cap, 640)
         else:
-            max_tokens = min(max_tokens, profile_cap)
+            max_tokens = min(max_tokens, profile_cap, full_cap)
 
         tool_list = list(tools or [])
         tool_list.append(remember_tool(agent_key))
@@ -102,15 +108,25 @@ class AgentRunner:
             user_id,
             tier,
             memory_service.search,
+            task_id=getattr(environment, "task_id", None) if environment else None,
         )
 
+        task_id = getattr(environment, "task_id", None) if environment else None
         history_turns = await chat_history.get_recent(
             user_id,
             agent_key,
-            limit=4 if tier == PromptTier.LIGHT else (8 if tier == PromptTier.STANDARD else 12),
+            limit=(
+                4
+                if tier == PromptTier.LIGHT
+                else (8 if tier == PromptTier.STANDARD else 12)
+            ),
+            task_id=task_id,
         )
         history_raw = chat_history.format_for_prompt(history_turns)
 
+        from src.agents_tg.services.playbook import load_playbook_block
+
+        playbook_block = load_playbook_block(user_id)
         system = build_system_prompt(
             tier=tier,
             human_name=human_name,
@@ -119,6 +135,7 @@ class AgentRunner:
             env_block=env_block,
             history_block=history_raw,
             memory_block=memory_ctx,
+            playbook_block=playbook_block,
             output_hints=output_hints,
             include_web_tools=include_web_tools,
             user_id=user_id,
@@ -153,9 +170,12 @@ class AgentRunner:
         }
         tools_used = False
 
+        from src.agents_tg.services.llm_context import set_llm_step_kind
+
         try:
             for _ in range(max_tool_rounds):
                 try:
+                    set_llm_step_kind("agent")
                     result = await llm_client.chat_completion(
                         messages,
                         temperature=temperature,
@@ -171,8 +191,12 @@ class AgentRunner:
 
                 if not tool_calls:
                     if content:
-                        await chat_history.append(user_id, agent_key, "user", user_message)
-                        await chat_history.append(user_id, agent_key, "assistant", content)
+                        await chat_history.append(
+                            user_id, agent_key, "user", user_message, task_id=task_id
+                        )
+                        await chat_history.append(
+                            user_id, agent_key, "assistant", content, task_id=task_id
+                        )
                         return content
                     if tools_used:
                         break
@@ -196,7 +220,9 @@ class AgentRunner:
                     args = parse_tool_arguments(fn.get("arguments"), user_id)
                     handler = handlers.get(name)
                     if not handler:
-                        tool_output = tool_result(ok=False, error=f"unknown_tool:{name}")
+                        tool_output = tool_result(
+                            ok=False, error=f"unknown_tool:{name}"
+                        )
                     else:
                         allowed, reason = await hook_registry.run_before_tool_call(
                             agent_key=agent_key,
@@ -206,7 +232,9 @@ class AgentRunner:
                             context=tool_hook_context,
                         )
                         if not allowed:
-                            tool_output = tool_result(ok=False, error=reason or "denied")
+                            tool_output = tool_result(
+                                ok=False, error=reason or "denied"
+                            )
                         else:
                             try:
                                 tool_output = await handler(**args)
@@ -238,6 +266,23 @@ class AgentRunner:
                             output=tool_output,
                             context=tool_hook_context,
                         )
+                        from src.agents_tg.services.tool_result_buffer import record
+
+                        try:
+                            import json as _json
+
+                            parsed = _json.loads(tool_output)
+                            record(user_id, name, parsed)
+                        except Exception:
+                            record(user_id, name, tool_output)
+                        from src.agents_tg.services.confirmation_delivery import (
+                            parse_confirmation_from_tool_output,
+                        )
+
+                        ui = parse_confirmation_from_tool_output(tool_output)
+                        sink = get_outbound_sink()
+                        if ui and sink is not None:
+                            sink.push_confirmation(ui.text, ui.reply_markup)
 
                     messages.append(
                         {
@@ -264,8 +309,12 @@ class AgentRunner:
         except RateLimitError:
             return self._RATE_LIMIT_REPLY
 
-        await chat_history.append(user_id, agent_key, "user", user_message)
-        await chat_history.append(user_id, agent_key, "assistant", final)
+        await chat_history.append(
+            user_id, agent_key, "user", user_message, task_id=task_id
+        )
+        await chat_history.append(
+            user_id, agent_key, "assistant", final, task_id=task_id
+        )
         return final
 
     async def _finalize_user_message(
@@ -285,7 +334,10 @@ class AgentRunner:
                 "content": build_finalize_prompt(has_tool_results=tools_used),
             }
         )
+        from src.agents_tg.services.llm_context import set_llm_step_kind
+
         try:
+            set_llm_step_kind("finalize")
             result = await llm_client.chat_completion(
                 finalize_messages,
                 temperature=temperature,
@@ -295,12 +347,16 @@ class AgentRunner:
             )
         except RateLimitError:
             for msg in reversed(messages):
-                if msg.get("role") == "assistant" and (msg.get("content") or "").strip():
+                if (
+                    msg.get("role") == "assistant"
+                    and (msg.get("content") or "").strip()
+                ):
                     return str(msg["content"]).strip()
             raise
         text = (result.get("content") or "").strip()
         if text:
             return text
+        set_llm_step_kind("finalize")
         return await llm_client.chat(
             finalize_messages,
             temperature=temperature,
@@ -328,7 +384,10 @@ class AgentRunner:
                 "content": "Продолжи ответ с места обрыва. Не повторяй уже сказанное.",
             }
         )
+        from src.agents_tg.services.llm_context import set_llm_step_kind
+
         try:
+            set_llm_step_kind("continue")
             result = await llm_client.chat_completion(
                 continue_messages,
                 temperature=temperature,
@@ -342,7 +401,9 @@ class AgentRunner:
         if not extra:
             return text
         if result.get("finish_reason") == "length" and len(extra) > 100:
-            return text + "\n\n" + extra + "\n\n<i>(ответ сокращён — уточните детали)</i>"
+            return (
+                text + "\n\n" + extra + "\n\n<i>(ответ сокращён — уточните детали)</i>"
+            )
         return text + "\n\n" + extra
 
     def _extend_plugin_and_mcp_tools(
@@ -352,9 +413,7 @@ class AgentRunner:
         from src.agents_tg.plugins.registry import plugin_registry
 
         settings = get_settings()
-        plugins_dir = (
-            settings.ROOT_DIR / "src" / "agents_tg" / "plugins"
-        )
+        plugins_dir = settings.ROOT_DIR / "src" / "agents_tg" / "plugins"
         plugin_registry.discover(plugins_dir)
         plugin_registry.register_demo_echo_tool()
         names = {t.name for t in tool_list}

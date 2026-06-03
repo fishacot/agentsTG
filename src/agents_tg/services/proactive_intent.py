@@ -79,7 +79,11 @@ async def try_schedule_from_message(
         return []
 
     text = message.strip()
-    if not (_AUTONOMY_CUE.search(text) or _DAILY_TIME.search(text) or _ONE_SHOT_REMIND.search(text)):
+    if not (
+        _AUTONOMY_CUE.search(text)
+        or _DAILY_TIME.search(text)
+        or _ONE_SHOT_REMIND.search(text)
+    ):
         return []
 
     from src.agents_tg.services.reminder_service import reminder_service
@@ -134,6 +138,8 @@ async def try_schedule_from_message(
 
 
 def build_scheduled_context(lines: list[str]) -> str:
-    from src.agents_tg.services.prompts.memory_block import build_scheduled_context as _build
+    from src.agents_tg.services.prompts.memory_block import (
+        build_scheduled_context as _build,
+    )
 
     return _build(lines)

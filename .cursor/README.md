@@ -23,7 +23,7 @@
 |------|---------|------------|
 | `hooks/ruff_after_py_edit.py` | afterFileEdit | Быстрый ruff check после правок `.py` |
 | `hooks/guard_destructive_shell.py` | beforeShellExecution | Подтверждение force-push / rm -rf |
-| `hooks/stop_verify_reminder.py` | stop | Напоминание pytest + implementation-notes |
+| `hooks/stop_verify_reminder.py` | *(отключён)* | ~~stop~~ — напоминание pytest + notes; убран из `hooks.json` по запросу |
 
 Конфиг: **`hooks.json`**. После правок перезагрузите окно Cursor (Hooks tab).
 

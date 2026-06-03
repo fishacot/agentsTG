@@ -58,7 +58,7 @@ async def deep_research(
                 }
             )
 
-    urls = [s["url"] for s in all_snippets if s.get("url")][:max_pages + 2]
+    urls = [s["url"] for s in all_snippets if s.get("url")][: max_pages + 2]
     pages = await fetch_multiple_pages(urls, max_pages=max_pages)
 
     page_by_url = {p["url"]: p for p in pages}
@@ -81,11 +81,28 @@ async def deep_research(
         merged_parts.append(block)
         total += len(block)
 
+    citations = format_research_citations(all_snippets[:10])
     return {
         "ok": True,
         "queries": queries,
         "sources": all_snippets[:10],
+        "citations": citations,
         "pages_fetched": len(pages),
         "context": "\n\n---\n\n".join(merged_parts),
         "source_count": len(all_snippets),
     }
+
+
+def format_research_citations(
+    sources: list[dict[str, str]], *, max_items: int = 5
+) -> str:
+    """Numbered citation block for LLM/user (Telegram HTML)."""
+    lines: list[str] = []
+    for i, snip in enumerate(sources[:max_items], start=1):
+        title = (snip.get("title") or "Источник").strip()
+        url = (snip.get("url") or "").strip()
+        if url:
+            lines.append(f'{i}. <a href="{url}">{title}</a>')
+        else:
+            lines.append(f"{i}. {title}")
+    return "\n".join(lines)

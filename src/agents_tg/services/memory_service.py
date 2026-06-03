@@ -169,7 +169,9 @@ class MemoryService:
             return
         from src.agents_tg.services.workspace_memory import refresh_memory_md
 
-        facts = [f.get("text", "") for f in await self.get_all(user_id) if f.get("text")]
+        facts = [
+            f.get("text", "") for f in await self.get_all(user_id) if f.get("text")
+        ]
         project_title = None
         try:
             from src.agents_tg.services.shared_context import shared_context

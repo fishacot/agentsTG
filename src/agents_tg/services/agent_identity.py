@@ -4,7 +4,7 @@ Each agent knows about other agents and can reference them.
 Human names assigned to each bot for personality.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 # Agent identities with human names, usernames, and designations
 # Mapping:

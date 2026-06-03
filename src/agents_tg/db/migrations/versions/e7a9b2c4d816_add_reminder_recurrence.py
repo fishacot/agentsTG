@@ -20,7 +20,9 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.add_column(
         "reminders",
-        sa.Column("recurrence", sa.String(length=16), server_default="once", nullable=False),
+        sa.Column(
+            "recurrence", sa.String(length=16), server_default="once", nullable=False
+        ),
     )
 
 

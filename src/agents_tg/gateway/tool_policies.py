@@ -33,7 +33,9 @@ def _validate_schedule_reminder(args: dict[str, Any]) -> str | None:
 
 
 def _validate_obsidian_note(args: dict[str, Any]) -> str | None:
-    content = str(args.get("content") or args.get("body") or args.get("text") or "").strip()
+    content = str(
+        args.get("content") or args.get("body") or args.get("text") or ""
+    ).strip()
     if not content:
         return "create_obsidian_note: content is required"
     return None

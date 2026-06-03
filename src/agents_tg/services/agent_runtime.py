@@ -6,7 +6,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Awaitable
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 if TYPE_CHECKING:
     from aiogram.types import Message
@@ -31,10 +31,19 @@ class TriggerKind(str, Enum):
 
 
 @dataclass
+class OutboundConfirmation:
+    """Inline confirmation UI to deliver after the run."""
+
+    text: str
+    reply_markup: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class AgentRunResult:
     """Result of an agent run — one or more outbound messages."""
 
     messages: list[str] = field(default_factory=list)
+    confirmations: list[OutboundConfirmation] = field(default_factory=list)
     silent: bool = False
 
     @property
@@ -83,6 +92,17 @@ class OutboundSink:
         if preview_enabled and preview_message is not None:
             self._preview = PreviewStreamer(preview_message)
         self._messages: list[str] = []
+        self._confirmations: list[OutboundConfirmation] = []
+
+    def push_confirmation(self, text: str, reply_markup: dict[str, Any]) -> None:
+        self._confirmations.append(
+            OutboundConfirmation(text=text, reply_markup=reply_markup)
+        )
+
+    def drain_confirmations(self) -> list[OutboundConfirmation]:
+        items = list(self._confirmations)
+        self._confirmations.clear()
+        return items
 
     async def push(self, text: str) -> None:
         cleaned = (text or "").strip()
@@ -169,15 +189,26 @@ class AgentRuntime:
             from src.agents_tg.services.llm_cooldown import llm_cooldown
 
             user_id = str(message.from_user.id) if message.from_user else "default"
+            from src.agents_tg.services.llm_context import set_llm_user_id
+
+            set_llm_user_id(user_id)
+            from src.agents_tg.services.llm_budget import llm_budget
+
+            if await llm_budget.is_exhausted(user_id):
+                used, limit = await llm_budget.get_usage(user_id)
+                return AgentRunResult(
+                    messages=[
+                        f"📓 Дневной лимит AI ({used}/{limit}) исчерпан. "
+                        "Завтра сбросится; важное — в NOTEBOOK или «запомни …»."
+                    ]
+                )
             allowed, wait_sec = await llm_cooldown.check(user_id)
             if not allowed:
                 from src.agents_tg.utils.structured_log import log_event
 
                 log_event("llm_cooldown", user_id=user_id, wait_sec=wait_sec)
                 return AgentRunResult(
-                    messages=[
-                        f"⏳ Подождите {wait_sec} сек. (лимит запросов к AI)."
-                    ]
+                    messages=[f"⏳ Подождите {wait_sec} сек. (лимит запросов к AI)."]
                 )
 
             reply = await process_fn(
@@ -194,10 +225,13 @@ class AgentRuntime:
             messages = _merge_run_messages(sink, reply)
             await sink.finalize_preview(messages[0] if messages else None)
 
-            if not messages:
+            if not messages and not sink._confirmations:
                 return AgentRunResult(messages=[])
 
-            return AgentRunResult(messages=messages)
+            return AgentRunResult(
+                messages=messages,
+                confirmations=sink.drain_confirmations(),
+            )
         finally:
             set_outbound_sink(None)
 
@@ -229,6 +263,9 @@ class AgentRuntime:
                 trigger=trigger.value,
             )
 
+            from src.agents_tg.services.llm_context import set_llm_user_id
+
+            set_llm_user_id(str(telegram_user_id))
             if not skip_cooldown:
                 from src.agents_tg.services.llm_cooldown import llm_cooldown
 
@@ -255,15 +292,22 @@ class AgentRuntime:
 
                 await llm_cooldown.record(str(telegram_user_id))
 
-            if reply and reply.strip().upper() in (SILENT_REPLY, "NO_REPLY", "HEARTBEAT_OK"):
+            if reply and reply.strip().upper() in (
+                SILENT_REPLY,
+                "NO_REPLY",
+                "HEARTBEAT_OK",
+            ):
                 return AgentRunResult(silent=True)
 
             messages = _merge_run_messages(sink, reply)
 
-            if not messages:
+            if not messages and not sink._confirmations:
                 return AgentRunResult(messages=[])
 
-            return AgentRunResult(messages=messages)
+            return AgentRunResult(
+                messages=messages,
+                confirmations=sink.drain_confirmations(),
+            )
         finally:
             set_outbound_sink(None)
 

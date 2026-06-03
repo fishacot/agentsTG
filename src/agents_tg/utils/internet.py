@@ -27,9 +27,7 @@ async def web_search(query: str, max_results: int = 5) -> list[dict[str, str]]:
                 return results
         except Exception as e:
             last_error = e
-            logger.warning(
-                "Web search attempt %s failed: %s", attempt + 1, e
-            )
+            logger.warning("Web search attempt %s failed: %s", attempt + 1, e)
             await asyncio.sleep(1.0 * (attempt + 1))
     logger.error("Web search error: %s", last_error)
     return []
@@ -90,7 +88,9 @@ async def fetch_web_page(url: str) -> str:
     return f"Error fetching page: {last_error}"
 
 
-async def fetch_multiple_pages(urls: list[str], max_pages: int = 3) -> list[dict[str, Any]]:
+async def fetch_multiple_pages(
+    urls: list[str], max_pages: int = 3
+) -> list[dict[str, Any]]:
     """Fetch up to max_pages URLs concurrently."""
     selected = urls[:max_pages]
     tasks = [fetch_web_page(u) for u in selected]

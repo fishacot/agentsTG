@@ -9,8 +9,8 @@ from src.agents_tg.services.prompts.system_directives import (
     TELEGRAM_HTML_FORMAT,
 )
 from src.agents_tg.services.prompts.tier_rules import (
-    PromptTier,
     RESEARCH_ACTION_PATTERN,
+    PromptTier,
     light_goal_directive,
     trim_env_block,
     trim_history_block,
@@ -27,6 +27,7 @@ def build_system_prompt(
     env_block: str,
     history_block: str,
     memory_block: str,
+    playbook_block: str = "",
     output_hints: str,
     include_web_tools: bool,
     user_id: str,
@@ -42,6 +43,9 @@ def build_system_prompt(
     )
     web_hint = WEB_TOOL_HINT if show_web else ""
     hints = f"\n\n{output_hints}" if output_hints and tier != PromptTier.LIGHT else ""
+    playbook = ""
+    if playbook_block and tier != PromptTier.LIGHT:
+        playbook = f"\n\n{playbook_block.strip()}"
 
     return (
         f"{goal}{protocol}\n\n{html_fmt}\n\n"
@@ -50,6 +54,7 @@ def build_system_prompt(
         f"{trim_env_block(env_block, tier)}"
         f"{trim_history_block(history_block, tier)}"
         f"{memory_block}"
+        f"{playbook}"
         f"{web_hint}{hints}\n\n"
         f"user_id для инструментов: {user_id}"
     )

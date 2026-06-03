@@ -32,6 +32,8 @@ class AgentEnvironment:
     notes_channel_configured: bool = False
     vault_path: str = "vault"
     bootstrap_block: str = ""
+    task_id: str | None = None
+    session_id: str | None = None
 
     def to_prompt_block(self) -> str:
         identity = get_agent_identity(self.agent_key)
@@ -87,6 +89,7 @@ async def build_environment(
     dm_recent: str = "",
     group_context_lines: int = 18,
     user_message: str = "",
+    task_id: str | None = None,
 ) -> AgentEnvironment:
     """Build environment context from a Telegram message."""
     from src.agents_tg.services.bootstrap_context import build_bootstrap_blocks
@@ -108,9 +111,7 @@ async def build_environment(
 
     facts_raw = await memory_service.get_all(user_id)
     facts_count = len(facts_raw)
-    fact_texts = [
-        (item.get("text") or item.get("memory") or "") for item in facts_raw
-    ]
+    fact_texts = [(item.get("text") or item.get("memory") or "") for item in facts_raw]
     fact_texts = [f for f in fact_texts if f]
 
     tier = detect_prompt_tier(user_message or dm_recent)
@@ -156,6 +157,7 @@ async def build_environment(
         notes_channel_configured=bool(settings.NOTES_CHANNEL_ID),
         vault_path=settings.OBSIDIAN_VAULT_PATH,
         bootstrap_block=bootstrap_block,
+        task_id=task_id,
     )
 
 
@@ -175,9 +177,7 @@ async def build_environment_scheduled(
     user_id = str(telegram_user_id)
     facts_raw = await memory_service.get_all(user_id)
     facts_count = len(facts_raw)
-    fact_texts = [
-        (item.get("text") or item.get("memory") or "") for item in facts_raw
-    ]
+    fact_texts = [(item.get("text") or item.get("memory") or "") for item in facts_raw]
     fact_texts = [f for f in fact_texts if f]
 
     tier = detect_prompt_tier(user_message or dm_recent)

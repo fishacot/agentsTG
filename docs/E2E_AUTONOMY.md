@@ -82,6 +82,23 @@
 | 29 | Heartbeat вне activeHours (08–23 MSK) | Skip |
 | 30 | Пользователь писал 2 мин назад | skipWhenBusy |
 
+## W11 — Delegation & progress (research promt4)
+
+| # | Сценарий | Бот | Ожидание |
+|---|----------|-----|----------|
+| D1 | DM: «найди новости Python, потом краткий код» (2+ шага) | Егор | План + прогресс «Шаг N/M» |
+| D2 | Группа: тот же multi-step | Егор | Прогресс + reply в тред |
+| D3 | Делегирование research | Егор → Ульяна | Шаг с agent_key research |
+| D4 | Долгая задача | Любой | editMessage / части без спама |
+| D5 | Inline «Отменить» (plan_cancel) | Егор | Статус cancelled, без новых шагов |
+| D6 | `REQUIRE_CONFIRM=true`, закрыть проект | Эльза | Да → replay `update_project_status:done` |
+| D7 | Callback «Нет» | — | Проект не done |
+| D8 | Повторный confirm token | — | «Подтверждение устарело» |
+| D9 | TTL >60s | — | Token expired |
+| D10 | Разные задачи подряд | Эльза | `СЕССИЯ ЗАДАЧИ` в prompt при task_id |
+
+**Prod sign-off:** после deploy записать в `docs/implementation-notes.md` дату и D1–D6 pass/fail.
+
 ## Appendix — extended scenarios (optional prod smoke)
 
 Дублирует часть W4–W10 с акцентом на sandbox/browser/artifacts. Основная матрица — секции W1–W10 выше.

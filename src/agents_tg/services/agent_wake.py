@@ -131,7 +131,9 @@ class AgentWakeService:
                 tg_uid = int(row["telegram_user_id"])
                 chat_id = int(row["chat_id"])
                 hours_silent = round((now - last_in).total_seconds() / 3600, 1)
-                from src.agents_tg.services.prompts.proactive import HEARTBEAT_WAKE_PROMPT
+                from src.agents_tg.services.prompts.proactive import (
+                    HEARTBEAT_WAKE_PROMPT,
+                )
 
                 heartbeat_md = load_heartbeat_md(tg_uid)
                 prompt = (
@@ -181,9 +183,7 @@ class AgentWakeService:
                 )
                 if not result.silent and result.messages:
                     body = "⏰ " + result.messages[0]
-                    await self._send_plain(
-                        chat_id, telegram_user_id, body, agent_key
-                    )
+                    await self._send_plain(chat_id, telegram_user_id, body, agent_key)
                     for extra in result.extras:
                         await self._send_plain(
                             chat_id, telegram_user_id, extra, agent_key
@@ -219,7 +219,9 @@ class AgentWakeService:
         """Orchestrator: soft check-in on active project (not full heartbeat)."""
         from src.agents_tg.services.shared_context import shared_context
 
-        candidates = await user_contact_service.list_wake_candidates(agent_key=agent_key)
+        candidates = await user_contact_service.list_wake_candidates(
+            agent_key=agent_key
+        )
         for row in candidates:
             last_in = self._as_utc(row.get("last_inbound_at"))
             if not last_in or now - last_in < quiet or now - last_in < busy:
@@ -250,9 +252,7 @@ class AgentWakeService:
     async def run_morning_digest(self, chat_id: int, telegram_user_id: int) -> None:
         settings = get_settings()
         if not settings.HEARTBEAT_DIGEST_LLM:
-            body = (
-                "🌅 Доброе утро! Напишите «мои дела» или «план на день» — помогу разложить."
-            )
+            body = "🌅 Доброе утро! Напишите «мои дела» или «план на день» — помогу разложить."
             await self._send_plain(chat_id, telegram_user_id, body)
             return
 
@@ -262,9 +262,7 @@ class AgentWakeService:
         tasks = await user_tasks_service.list_tasks(telegram_user_id=telegram_user_id)
         pending = await reminder_service.list_pending(telegram_user_id)
         task_lines = ", ".join(t["title"] for t in tasks.get("tasks") or []) or "нет"
-        rem_lines = ", ".join(
-            (p.get("text") or "")[:40] for p in pending[:5]
-        ) or "нет"
+        rem_lines = ", ".join((p.get("text") or "")[:40] for p in pending[:5]) or "нет"
 
         prompt = (
             "[Утренний digest 09:00 МСК — проактивное сообщение]\n"

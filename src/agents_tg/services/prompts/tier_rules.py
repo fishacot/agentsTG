@@ -59,7 +59,9 @@ class PromptTier(str, Enum):
     FULL = "full"
 
 
-def detect_prompt_tier(user_message: str, *, include_web_tools: bool = False) -> PromptTier:
+def detect_prompt_tier(
+    user_message: str, *, include_web_tools: bool = False
+) -> PromptTier:
     text = (user_message or "").strip()
     if not text:
         return PromptTier.LIGHT

@@ -180,7 +180,9 @@ class AgentJobStore:
             if result_summary is not None:
                 self._memory[job_id]["result_summary"] = result_summary
 
-    async def list_by_status(self, status: str, limit: int = 50) -> list[dict[str, Any]]:
+    async def list_by_status(
+        self, status: str, limit: int = 50
+    ) -> list[dict[str, Any]]:
         if self._factory:
             try:
                 from src.agents_tg.db.models import AgentJob

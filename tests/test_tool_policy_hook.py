@@ -4,8 +4,8 @@ import pytest
 
 from src.agents_tg.gateway.hooks.tool_policy import before_tool_policy_guard
 from src.agents_tg.gateway.tool_policies import (
-    is_tool_denied_for_agent_with_args,
     is_tool_allowed_for_tier,
+    is_tool_denied_for_agent_with_args,
 )
 from src.agents_tg.services.prompts.tier_rules import PromptTier
 from src.agents_tg.services.tools.builtin import AgentTool, tool_result
@@ -27,7 +27,9 @@ async def test_agent_deny_run_code_for_pa():
 @pytest.mark.asyncio
 async def test_tier_light_denies_all_tools():
     tools = [
-        AgentTool(name="remember_about_user", description="d", parameters={}, handler=_dummy),
+        AgentTool(
+            name="remember_about_user", description="d", parameters={}, handler=_dummy
+        ),
     ]
     assert not is_tool_allowed_for_tier(
         tool_name="remember_about_user",

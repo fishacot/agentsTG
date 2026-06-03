@@ -16,6 +16,8 @@ _SOULS_DIR = Path(__file__).resolve().parent.parent.parent / "agents" / "souls"
 _SOUL_FILE_ALIASES: dict[str, str] = {
     "coder": "coder_soul.md",
     "general": "general.md",
+    "research": "research.md",
+    "sports_analyst": "research.md",
 }
 
 

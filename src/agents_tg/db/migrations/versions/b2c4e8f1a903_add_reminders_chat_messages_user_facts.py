@@ -33,7 +33,9 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_chat_messages_telegram_user_id", "chat_messages", ["telegram_user_id"])
+    op.create_index(
+        "ix_chat_messages_telegram_user_id", "chat_messages", ["telegram_user_id"]
+    )
     op.create_index("ix_chat_messages_agent_key", "chat_messages", ["agent_key"])
 
     op.create_table(
@@ -50,7 +52,9 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_user_facts_telegram_user_id", "user_facts", ["telegram_user_id"])
+    op.create_index(
+        "ix_user_facts_telegram_user_id", "user_facts", ["telegram_user_id"]
+    )
 
     op.create_table(
         "reminders",

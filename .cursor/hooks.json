@@ -12,12 +12,6 @@
         "command": "python .cursor/hooks/guard_destructive_shell.py",
         "timeout": 10
       }
-    ],
-    "stop": [
-      {
-        "command": "python .cursor/hooks/stop_verify_reminder.py",
-        "timeout": 15
-      }
     ]
   }
 }

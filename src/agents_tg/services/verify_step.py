@@ -7,6 +7,9 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from src.agents_tg.config.settings import get_settings
+from src.agents_tg.services.tool_schemas import validate_tool_output
+
 _ERROR_MARKERS = (
     '"ok": false',
     '"ok":"false"',
@@ -61,7 +64,18 @@ async def verify_step_result(
         )
     if tool_results:
         for tr in tool_results:
-            if isinstance(tr, dict) and tr.get("ok") is False:
+            if not isinstance(tr, dict):
+                continue
+            tname = str(tr.get("tool") or tr.get("name") or "")
+            payload = tr.get("result") if "result" in tr else tr
+            schema_ok, schema_reason = validate_tool_output(tname, payload)
+            if not schema_ok:
+                return VerifyStepResult(
+                    ok=False,
+                    issues=schema_reason or "tool schema validation failed",
+                    suggest_replan=True,
+                )
+            if tr.get("ok") is False:
                 return VerifyStepResult(
                     ok=False,
                     issues="structured tool result not ok",
@@ -80,4 +94,28 @@ async def verify_step_result(
             issues="response unusually short",
             suggest_replan=False,
         )
+
+    settings = get_settings()
+    if getattr(settings, "VERIFY_LLM_JUDGE", False):
+        try:
+            from src.agents_tg.services.llm_client import llm_client
+
+            judge_prompt = (
+                "Ответь одним словом OK или FAIL. "
+                f"Задача: {instruction[:300]}\nОтвет агента: {summary[:800]}"
+            )
+            verdict = await llm_client.chat(
+                messages=[{"role": "user", "content": judge_prompt}],
+                max_tokens=8,
+                temperature=0,
+            )
+            if verdict and "fail" in verdict.lower():
+                return VerifyStepResult(
+                    ok=False,
+                    issues="llm judge rejected step",
+                    suggest_replan=True,
+                )
+        except Exception:
+            pass
+
     return VerifyStepResult(ok=True)

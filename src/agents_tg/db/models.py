@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, JSON, Numeric, String, Text, func
+from sqlalchemy import JSON, DateTime, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.agents_tg.db.base import Base
@@ -118,6 +118,9 @@ class ChatMessage(Base):
     agent_key: Mapped[str] = mapped_column(String(64), index=True)
     role: Mapped[str] = mapped_column(String(16))
     content: Mapped[str] = mapped_column(Text)
+    task_id: Mapped[Optional[str]] = mapped_column(
+        String(32), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -257,7 +260,9 @@ class AgentJob(Base):
     status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
     trigger: Mapped[str] = mapped_column(String(32), default="inbound")
     payload: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    idempotency_key: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
+    idempotency_key: Mapped[Optional[str]] = mapped_column(
+        String(128), nullable=True, index=True
+    )
     result_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -321,6 +326,23 @@ class PendingConfirmation(Base):
     action: Mapped[str] = mapped_column(String(128))
     payload: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+
+class PlanRecipe(Base):
+    """Successful plan templates for orchestrator reuse."""
+
+    __tablename__ = "plan_recipes"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(index=True)
+    intent_hash: Mapped[str] = mapped_column(String(64), index=True)
+    intent_sample: Mapped[str] = mapped_column(String(512))
+    steps_json: Mapped[list] = mapped_column(JSON)
+    success_count: Mapped[int] = mapped_column(default=1)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

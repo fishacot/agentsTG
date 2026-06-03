@@ -19,6 +19,6 @@ alwaysApply: true
 
 **Не применять** TS-правила team-kit (`typescript-exhaustive-switch`, `no-inline-imports`) — стек Python.
 
-**Hooks проекта:** `.cursor/hooks.json` — ruff после правок `.py`, guard destructive shell, verify reminder на stop.
+**Hooks проекта:** `.cursor/hooks.json` — ruff после правок `.py`, guard destructive shell.
 
 **Verify канон:** `docs/PROJECT_VERIFICATION.md`.

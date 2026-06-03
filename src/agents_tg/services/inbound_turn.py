@@ -100,8 +100,8 @@ class InboundTurnService:
                         message=message,
                         user_text=user_text,
                         process_fn=self._make_process_fn(bot, bound),
-                        deliver_fn=lambda msg, text: self._deliver_extra_message(
-                            bot, msg, text
+                        deliver_fn=lambda msg, text, **kw: self._deliver_extra_message(
+                            bot, msg, text, **kw
                         ),
                     )
                     profile = get_delivery_profile(bot.agent_key)
@@ -148,7 +148,7 @@ class InboundTurnService:
                         await thinking_msg.delete()
                         return
 
-                if bot.agent_key == "orchestrator" and is_group and primary:
+                if bot.agent_key == "orchestrator" and primary:
                     plan = coordinator.get_plan(message.chat.id)
                     primary = await maybe_delegate_async(
                         plan=plan,
@@ -156,8 +156,8 @@ class InboundTurnService:
                         message=message,
                         user_text=user_text,
                         process_fn=self._make_process_fn(bot, bound),
-                        deliver_fn=lambda msg, text: self._deliver_extra_message(
-                            bot, msg, text
+                        deliver_fn=lambda msg, text, **kw: self._deliver_extra_message(
+                            bot, msg, text, **kw
                         ),
                     )
 
@@ -176,6 +176,17 @@ class InboundTurnService:
                         reply_in_group=is_group,
                         thinking_message=None,
                         chunk_limit=profile.text_chunk_limit,
+                    )
+
+                for conf in run_result.confirmations:
+                    await send_agent_response(
+                        message,
+                        conf.text,
+                        reply_in_group=is_group,
+                        thinking_message=None,
+                        chunk_limit=profile.text_chunk_limit,
+                        reply_markup=conf.reply_markup,
+                        reply_to_message_id=message.message_id,
                     )
 
                 if is_group and sent and primary:
@@ -211,7 +222,10 @@ class InboundTurnService:
 
             except Exception as exc:
                 job_failed = True
-                from src.agents_tg.services.llm_client import QwenAPIError, RateLimitError
+                from src.agents_tg.services.llm_client import (
+                    QwenAPIError,
+                    RateLimitError,
+                )
 
                 logger.error(
                     "Error processing message in %s: %s",
@@ -261,7 +275,13 @@ class InboundTurnService:
         return process_fn
 
     async def _deliver_extra_message(
-        self, bot: AgentBot, message: Message, text: str
+        self,
+        bot: AgentBot,
+        message: Message,
+        text: str,
+        *,
+        reply_markup: dict | None = None,
+        reply_to_message_id: int | None = None,
     ) -> None:
         from src.agents_tg.services.agent_delivery_profile import get_delivery_profile
         from src.agents_tg.utils.telegram_format import send_agent_response
@@ -273,6 +293,8 @@ class InboundTurnService:
             reply_in_group=False,
             thinking_message=None,
             chunk_limit=profile.text_chunk_limit,
+            reply_markup=reply_markup,
+            reply_to_message_id=reply_to_message_id or message.message_id,
         )
 
     async def _auto_log_project_activity(

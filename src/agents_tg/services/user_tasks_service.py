@@ -104,7 +104,9 @@ class UserTasksService:
             ]
         return {"ok": True, "tasks": tasks}
 
-    async def _list_pg(self, telegram_user_id: int, status: str) -> list[dict[str, Any]]:
+    async def _list_pg(
+        self, telegram_user_id: int, status: str
+    ) -> list[dict[str, Any]]:
         from sqlalchemy import select
 
         from src.agents_tg.db.models import UserTask

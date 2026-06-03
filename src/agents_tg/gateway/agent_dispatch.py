@@ -20,6 +20,7 @@ async def dispatch_agent(
     message: Any,
     user_text: str,
     coordinator: Any = None,
+    task_id: str | None = None,
 ) -> Optional[str]:
     """Route envelope to the correct agent processor (single L3 entry)."""
     agent_key = envelope.agent_key
@@ -35,7 +36,7 @@ async def dispatch_agent(
             )
         dm_recent = ""
     else:
-        turns = await chat_history.get_recent(user_id, agent_key)
+        turns = await chat_history.get_recent(user_id, agent_key, task_id=task_id)
         dm_recent = chat_history.format_for_prompt(turns)
 
     environment = await build_environment(
@@ -46,6 +47,7 @@ async def dispatch_agent(
         dm_recent=dm_recent,
         group_context_lines=18,
         user_message=user_text,
+        task_id=task_id,
     )
 
     from src.agents_tg.services.agent_outer_loop import agent_outer_loop
@@ -55,6 +57,7 @@ async def dispatch_agent(
         user_text=user_text,
         user_id=user_id,
         environment=environment,
+        task_id=task_id,
     )
 
 

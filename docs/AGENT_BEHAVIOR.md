@@ -34,11 +34,11 @@
 |-------|-----|------------------------|----------|
 | **Егор** | @egor_orchestrator_bot | Маршрутизация, direct reply | Привет, «кто ты», координация |
 | **Эльза** | @elliza_pa_bot | Заметки, задачи | Организация, память, small talk |
-| **Руслан** | @ruslan_coder_bot | web_search | Код, архитектура |
-| **Ульяна** | @ulyana_research_bot | web_search | Ресерч, ссылки |
-| **Артём** | @artem_security_bot | web_search | Безопасность |
-| **Ваня** | @aivanya_business_bot | web_search | Бизнес, MVP |
-| **Тася** | @tasya_marketing_bot | web_search | Маркетинг |
+| **Руслан** | @ruslan_coder_bot | deep_research, run_code (tier) | Код, архитектура |
+| **Ульяна** | @ulyana_research_bot | deep_research, browser_* | Ресерч, ссылки |
+| **Артём** | @artem_security_bot | deep_research | Безопасность |
+| **Ваня** | @aivanya_business_bot | deep_research | Бизнес, MVP |
+| **Тася** | @tasya_marketing_bot | deep_research | Маркетинг |
 
 ## Егор vs специалисты
 

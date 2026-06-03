@@ -24,7 +24,9 @@ def upgrade() -> None:
         sa.Column("telegram_user_id", sa.Integer(), nullable=False),
         sa.Column("title", sa.String(length=512), nullable=False),
         sa.Column("due_date", sa.String(length=32), nullable=True),
-        sa.Column("status", sa.String(length=16), server_default="pending", nullable=False),
+        sa.Column(
+            "status", sa.String(length=16), server_default="pending", nullable=False
+        ),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -33,7 +35,9 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_user_tasks_telegram_user_id", "user_tasks", ["telegram_user_id"])
+    op.create_index(
+        "ix_user_tasks_telegram_user_id", "user_tasks", ["telegram_user_id"]
+    )
     op.create_index("ix_user_tasks_status", "user_tasks", ["status"])
 
     op.create_table(

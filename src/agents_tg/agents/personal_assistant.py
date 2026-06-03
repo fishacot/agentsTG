@@ -31,9 +31,13 @@ class PersonalAssistant:
         self._soul_path = Path(__file__).parent / "souls" / "personal_assistant.md"
 
     def _load_soul(self) -> str:
-        if self._soul_path.exists():
-            return self._soul_path.read_text(encoding="utf-8")
-        return ""
+        from src.agents_tg.services.prompts.identity import load_soul
+
+        return load_soul("personal_assistant") or (
+            self._soul_path.read_text(encoding="utf-8")
+            if self._soul_path.exists()
+            else ""
+        )
 
     def _valid_note_title(self, title: str) -> bool:
         cleaned = title.strip().lower()
@@ -294,9 +298,8 @@ class PersonalAssistant:
         environment_block: str = "",
     ) -> str:
         """Understand the user's goal; LLM formulates every user-visible reply."""
-        from src.agents_tg.services.environment_context import AgentEnvironment
-
         from src.agents_tg.services.check_in_cooldown import check_in_cooldown
+        from src.agents_tg.services.environment_context import AgentEnvironment
         from src.agents_tg.services.prompt_builder import PromptTier, detect_prompt_tier
         from src.agents_tg.services.shared_context import shared_context
 

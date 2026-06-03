@@ -6,7 +6,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Awaitable
+from typing import Any, Awaitable, Callable
 
 from src.agents_tg.config.settings import get_settings
 from src.agents_tg.utils.timezone_utils import format_local, local_to_utc
@@ -136,7 +136,8 @@ class ReminderService:
 
         async with self._pg_engine.begin() as conn:
             result = await conn.execute(
-                insert(Reminder).values(
+                insert(Reminder)
+                .values(
                     telegram_user_id=telegram_user_id,
                     chat_id=chat_id,
                     agent_key=agent_key,
@@ -145,7 +146,8 @@ class ReminderService:
                     timezone_name=tz_name,
                     recurrence=recurrence,
                     status="pending",
-                ).returning(Reminder.id)
+                )
+                .returning(Reminder.id)
             )
             row = result.first()
             return int(row[0])
@@ -284,7 +286,9 @@ class ReminderService:
                     )
                 else:
                     await conn.execute(
-                        update(Reminder).where(Reminder.id == r.id).values(status="sent")
+                        update(Reminder)
+                        .where(Reminder.id == r.id)
+                        .values(status="sent")
                     )
                 await self._deliver(
                     r.chat_id,
@@ -351,7 +355,9 @@ class ReminderService:
             (p.get("text") or "").startswith(MORNING_DIGEST_MARKER) for p in pending
         )
 
-    async def schedule_morning_digest_if_missing(self, chat_id: int, user_id: int) -> None:
+    async def schedule_morning_digest_if_missing(
+        self, chat_id: int, user_id: int
+    ) -> None:
         """Register recurring 09:00 MSK digest for a user."""
         if await self.has_pending_digest(user_id):
             return

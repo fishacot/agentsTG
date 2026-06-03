@@ -18,8 +18,14 @@ LLM_PROVIDER_CHAIN=groq
 APP_TIMEZONE=Europe/Moscow
 HEALTH_PORT=8080
 MESSAGE_DEBOUNCE_MS=2000
-LLM_COOLDOWN_SEC=3.0
+LLM_COOLDOWN_SEC=4.0
+LLM_SOFT_DAILY_CALLS=80
+MAX_PLAN_STEPS=4
+GROQ_DEFER_HEAVY_ON_BUDGET=true
+NOTEBOOK_MAX_CHARS=1500
 ```
+
+См. [`docs/RESOURCE_AND_LLM.md`](../docs/RESOURCE_AND_LLM.md) — память вне Groq (NOTEBOOK.md), лимиты планов и мягкий дневной бюджет.
 
 ## Update after git push
 

@@ -40,6 +40,16 @@ class PlanTaskView:
     steps: list[PlanStepView] = field(default_factory=list)
 
 
+@dataclass
+class _PlanResumeHandle:
+    task: PlanTask
+    message: Any
+    user_text: str
+    process_fn: ProcessFn
+    deliver_fn: DeliverFn | None
+    progress_fn: ProgressFn | None
+
+
 class PlanExecutor:
     """Execute plan steps via gateway agent dispatch."""
 
@@ -48,6 +58,7 @@ class PlanExecutor:
         self._factory: async_sessionmaker[AsyncSession] | None = None
         self._memory_tasks: dict[str, dict[str, Any]] = {}
         self._memory_steps: dict[str, list[dict[str, Any]]] = {}
+        self._resume_handles: dict[str, _PlanResumeHandle] = {}
 
     def set_engine(self, engine: AsyncEngine) -> None:
         self._engine = engine
@@ -126,21 +137,150 @@ class PlanExecutor:
             steps=list(steps),
         )
 
-    async def execute_steps(
+    def register_plan_resume(
+        self,
+        task_id: str,
+        *,
+        task: PlanTask,
+        message: Any,
+        user_text: str,
+        process_fn: ProcessFn,
+        deliver_fn: DeliverFn | None = None,
+        progress_fn: ProgressFn | None = None,
+    ) -> None:
+        self._resume_handles[task_id] = _PlanResumeHandle(
+            task=task,
+            message=message,
+            user_text=user_text,
+            process_fn=process_fn,
+            deliver_fn=deliver_fn,
+            progress_fn=progress_fn,
+        )
+
+    def unregister_plan_resume(self, task_id: str) -> None:
+        self._resume_handles.pop(task_id, None)
+
+    async def get_task_context(self, task_id: str) -> dict[str, Any]:
+        if self._factory:
+            try:
+                from src.agents_tg.db.models import AgentTask
+
+                async with self._factory() as session:
+                    result = await session.execute(
+                        select(AgentTask).where(AgentTask.id == task_id)
+                    )
+                    row = result.scalar_one_or_none()
+                    if row and row.context_json:
+                        return dict(row.context_json)
+            except Exception as exc:
+                logger.debug("PG task context read failed: %s", exc)
+        rec = self._memory_tasks.get(task_id)
+        if rec:
+            return dict(rec.get("context_json") or {})
+        return {}
+
+    async def on_a2a_step_callback(
+        self,
+        task_id: str,
+        *,
+        step_index: int,
+        status: str,
+        summary: str = "",
+    ) -> dict[str, Any]:
+        """Mark external step result; optionally resume in-process plan."""
+        normalized = (status or "").lower()
+        failed = normalized in ("failed", "error", "cancelled")
+        if failed:
+            await self._update_step(
+                task_id,
+                step_index,
+                status="failed",
+                result_summary=summary[:500] or normalized,
+            )
+            await self._update_task_status(task_id, "failed")
+            return {"ok": True, "resumed": False, "failed": True}
+
+        await self._update_step(
+            task_id,
+            step_index,
+            status="done",
+            result_summary=summary[:500] if summary else "a2a ok",
+        )
+        steps = await self._get_steps(task_id)
+        next_index = step_index + 1
+        if next_index >= len(steps):
+            await self._update_task_status(task_id, "done")
+            await self.update_task_context(
+                task_id, {"a2a_complete": True, "resume_from_step": None}
+            )
+            return {"ok": True, "resumed": False, "complete": True}
+
+        await self.update_task_context(
+            task_id,
+            {
+                "a2a_last_completed": step_index,
+                "resume_from_step": next_index,
+            },
+        )
+        resumed = await self._try_resume_registered_plan(
+            task_id, start_index=next_index
+        )
+        return {
+            "ok": True,
+            "resumed": resumed,
+            "complete": False,
+            "next_step": next_index,
+        }
+
+    async def _try_resume_registered_plan(
+        self, task_id: str, *, start_index: int
+    ) -> bool:
+        handle = self._resume_handles.get(task_id)
+        if not handle:
+            return False
+        from src.agents_tg.services.background_runs import background_runs
+
+        async def _resume() -> None:
+            try:
+                await self.execute_steps_from_index(
+                    handle.task,
+                    start_index=start_index,
+                    message=handle.message,
+                    user_text=handle.user_text,
+                    process_fn=handle.process_fn,
+                    deliver_fn=handle.deliver_fn,
+                    progress_fn=handle.progress_fn,
+                )
+            except Exception as exc:
+                logger.exception("Plan resume after A2A failed: %s", exc)
+
+        background_runs.spawn(name=f"plan_a2a_resume_{task_id}", coro_factory=_resume)
+        return True
+
+    async def execute_steps_from_index(
         self,
         task: PlanTask,
         *,
+        start_index: int,
         message: Any,
         user_text: str,
         process_fn: ProcessFn,
         deliver_fn: DeliverFn | None = None,
         progress_fn: ProgressFn | None = None,
     ) -> str:
+        """Run plan steps from start_index (after external A2A completion)."""
+        start_index = max(0, start_index)
         results: list[str] = []
         total = len(task.steps)
+        from src.agents_tg.services.plan_cancel import clear_cancel, is_cancelled
         from src.agents_tg.services.progress_ux import format_step_done
 
-        for i, (step_agent, instruction) in enumerate(task.steps):
+        for i in range(start_index, total):
+            step_agent, instruction = task.steps[i]
+            if is_cancelled(task.task_id):
+                await self._update_task_status(task.task_id, "cancelled")
+                clear_cancel(task.task_id)
+                return "⏹ План отменён."
             if progress_fn:
                 await progress_fn(i + 1, total, step_agent)
             try:
@@ -163,6 +303,26 @@ class PlanExecutor:
             if deliver_fn:
                 await deliver_fn(message, format_step_done(i + 1, total))
         return results[-1] if results else ""
+
+    async def execute_steps(
+        self,
+        task: PlanTask,
+        *,
+        message: Any,
+        user_text: str,
+        process_fn: ProcessFn,
+        deliver_fn: DeliverFn | None = None,
+        progress_fn: ProgressFn | None = None,
+    ) -> str:
+        return await self.execute_steps_from_index(
+            task,
+            start_index=0,
+            message=message,
+            user_text=user_text,
+            process_fn=process_fn,
+            deliver_fn=deliver_fn,
+            progress_fn=progress_fn,
+        )
 
     async def execute_step(
         self,
@@ -201,20 +361,29 @@ class PlanExecutor:
         )
 
         try:
+            from src.agents_tg.services.llm_context import set_llm_step_kind
+
+            set_llm_step_kind("plan_step")
             result = await dispatch_agent(
                 envelope,
                 message=message,
                 user_text=prompt,
                 coordinator=None,
+                task_id=task_id,
             )
             from src.agents_tg.services.progress_ux import strip_supervisor_json_leak
             from src.agents_tg.services.verify_step import verify_step_result
 
             cleaned = strip_supervisor_json_leak(result or "")
+            from src.agents_tg.services.tool_result_buffer import drain
+
+            uid = str(getattr(from_user, "id", 0) if from_user else 0)
+            tool_results = drain(uid)
             vr = await verify_step_result(
                 instruction=instr,
                 step_summary=cleaned,
                 agent_key=agent_key,
+                tool_results=tool_results or None,
             )
             if not vr.ok:
                 await self._update_step(

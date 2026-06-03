@@ -66,7 +66,10 @@ flowchart TB
 | L3 | `services/plan_executor.py` | Manus step runner + PG `plan_steps` |
 | L3 | `services/verify_step.py` | Verify-lite after each plan step |
 | L3 | `services/progress_ux.py` | Unified `Шаг N/M` Telegram HTML |
-| L4 | `services/prompts/` | OpenClaw-style layers: system_directives, styles/, orchestrator_directives, finalize_directives, tier_rules, assembler |
+| L4 | `services/prompts/` | OpenClaw-style layers: system_directives, `styles/` (research, security, coder, specialist), orchestrator_directives, finalize_directives, tier_rules, assembler |
+| L4 | `agents/souls/` | SOUL per bot; `research.md` + `identity.load_soul()` aliases |
+| L4 | `services/verify_step.py` + `tool_schemas.py` | Post-step schema + heuristics; optional `VERIFY_LLM_JUDGE` |
+| L4 | `services/delegation_envelope.py` | Plan/orchestrator delegation contract in `context_json` |
 | L4 | `gateway/tool_policies.py` | Declarative agent deny + tier allow + high-risk validators |
 | L4 | `gateway/hooks/tool_policy.py` | Deterministic before_tool tier enforcement |
 | L4 | `services/tools/registry.py` | Per-agent tool name matrix |

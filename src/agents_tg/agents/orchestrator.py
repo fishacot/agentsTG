@@ -22,7 +22,6 @@ from src.agents_tg.services.agent_prompts import (
     ORCHESTRATOR_JSON_DIRECTIVE,
     REPLAN_DIRECTIVE,
 )
-from src.agents_tg.utils.structured_log import log_event
 from src.agents_tg.services.llm_client import llm_client
 from src.agents_tg.services.memory_service import memory_service
 from src.agents_tg.services.prompt_builder import (
@@ -31,6 +30,7 @@ from src.agents_tg.services.prompt_builder import (
     trim_env_block,
 )
 from src.agents_tg.services.supervisor_parse import parse_supervisor_response
+from src.agents_tg.utils.structured_log import log_event
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +70,11 @@ class Orchestrator:
 
     def _load_soul(self, agent_name: str) -> str:
         """Load SOUL.md for a specific agent."""
+        from src.agents_tg.services.prompts.identity import load_soul
+
+        text = load_soul(agent_name)
+        if text:
+            return text
         soul_file = self.souls_path / f"{agent_name}.md"
         if soul_file.exists():
             return soul_file.read_text(encoding="utf-8")
@@ -176,7 +181,9 @@ class Orchestrator:
         )
         user_id = state.get("user_id", "default")
         orchestrator_soul = self._load_soul("orchestrator")
-        env_block = trim_env_block(state.get("environment_block", ""), PromptTier.STANDARD)
+        env_block = trim_env_block(
+            state.get("environment_block", ""), PromptTier.STANDARD
+        )
 
         memories = await memory_service.search(user_content, user_id=user_id, limit=4)
         memory_context = ""
@@ -448,7 +455,9 @@ class Orchestrator:
                     "живым языком, без делегирования и без JSON."
                 ),
                 include_web_tools=False,
-                environment=environment if isinstance(environment, AgentEnvironment) else None,
+                environment=(
+                    environment if isinstance(environment, AgentEnvironment) else None
+                ),
                 environment_block=env_block,
                 temperature=0.5,
                 max_tokens=512,
@@ -476,7 +485,9 @@ class Orchestrator:
 
             get_coordinator().set_plan(environment.chat_id, plan)
 
-        from src.agents_tg.services.orchestrator_project import maybe_bind_plan_to_project
+        from src.agents_tg.services.orchestrator_project import (
+            maybe_bind_plan_to_project,
+        )
 
         await maybe_bind_plan_to_project(user_id, message, plan)
 

@@ -3,7 +3,6 @@
 import ast
 from pathlib import Path
 
-
 FORBIDDEN_IMPORTS = {
     "personal_assistant",
     "orchestrator",
@@ -12,7 +11,13 @@ FORBIDDEN_IMPORTS = {
 
 
 def test_agent_bot_no_direct_agent_imports():
-    path = Path(__file__).resolve().parents[1] / "src" / "agents_tg" / "bots" / "agent_bot.py"
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "agents_tg"
+        / "bots"
+        / "agent_bot.py"
+    )
     tree = ast.parse(path.read_text(encoding="utf-8"))
     found: set[str] = set()
     for node in ast.walk(tree):

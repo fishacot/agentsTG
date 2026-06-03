@@ -6,7 +6,167 @@
 
 ---
 
-## 2026-06-02 — VPS deploy + verify (FirstByte)
+## 2026-06-03 — Ship batch (MVP parity code)
+
+### Verify
+- `python -m pytest tests/ -q` — **230 passed** (~50s); лог: `docs/last_pytest_run.txt`
+- `black` / `isort` на `src/` + `tests/`
+
+### Включено в релиз
+- Manus: `plan_progress`, A2A resume, `task_id` PG, confirm sink в фоне, `STEP_MODEL_ROUTING`
+- Calendar: экспорт `.ics` в `workspace/users/{id}/calendar/`
+- Доки: `ROADMAP_MVP`, `MVP_GAP_AUDIT`, `VPS_E2E_RUNBOOK`, research/, eval harness
+- Скрипт: `scripts/ship.ps1`
+
+### Не в коммит
+- `ответ на промт*.md` (исходники research в корне)
+- `scripts/_patch_resource_mitigations.py` (одноразовый патч)
+
+---
+
+## 2026-05-31 — Gap audit (скепсис vs OpenClaw/Manus)
+
+### Честный вывод
+- «Фазы 0–5 done» в todo = **код + pytest**, не prod parity.
+- Полный аудит: [`docs/MVP_GAP_AUDIT.md`](MVP_GAP_AUDIT.md).
+
+### Исправлено в этой сессии (P0 код)
+- `llm_step_routing` → `llm_client.chat_completion` + `set_llm_step_kind` (plan_step / agent / finalize / continue).
+- `task_id` в `dispatch_agent` → `build_environment` + `chat_history.get_recent` для шагов плана.
+- `docs/OPENCLAW_PARITY.md` — confirmation gates → done (с оговоркой prod `REQUIRE_CONFIRM`).
+- Subagent follow-up: `OutboundSink` на фоновом плане (`orchestrator_delegate`); HTTP API fail-closed (`health_server`, `tests/test_health_api_token.py`).
+
+### 2026-05-31 (batch 2) — P1 код без VPS
+- `plan_progress.py` — один editMessage для прогресса плана.
+- `plan_executor`: A2A `on_a2a_step_callback`, `register_plan_resume`, `execute_steps_from_index`.
+- PG: `chat_messages.task_id` + migration `g1h3i5j7k019`.
+- `docs/VPS_E2E_RUNBOOK.md` — чеклист вечера на VPS.
+
+### Остаётся P0 human / P2
+- E2E sign-off по runbook, CalDAV write, MCP stdio, live eval.
+
+### Verify
+- `python -m pytest tests/test_llm_step_routing.py tests/test_llm_client_routing.py tests/test_chat_history.py -q`
+
+---
+
+## 2026-06-03 — Roadmap MVP фазы 0–5 (код)
+
+### Статус по фазам (код + unit tests; prod E2E — human)
+
+| Фаза | Сделано в репо | Prod sign-off |
+|------|----------------|---------------|
+| 0 Trust | confirm inline → `OutboundSink` + `inbound_turn`; `run_code` replay + gate; `E2E_SIGNOFF_TEMPLATE.md` | W11 D1–D6 — шаблон в notes |
+| 1 Manus UX | `tool_results`→verify; `task_id` в plan dispatch; handoff + reply_to; cancel keyboard; **нет** single editMessage прогресс | Telegram manual |
+| 2 Integrations | calendar/github/staff_summary tools; `INTEGRATIONS.md`; MCP allowlist POC | smoke в E2E_SIGNOFF |
+| 3 Rules | `playbook.py` + assembler; `plan_recipes` + service + orchestrator reuse; business/marketing styles; `METRICS.md` | — |
+| 4 Platform | `AGENT_RUN_API_TOKEN`; `/v1/models`; A2A callback + task context; `STEP_MODEL_ROUTING` wired in `llm_client` | curl + manual |
+| 5 Maturity | `EVAL_HARNESS` 20+ scenarios; `WEB_APPS.md`; `FIRECRACKER_SPIKE.md` | eval pytest |
+
+### Verify (local)
+- `python -m pytest tests/ -q --tb=short` — ожидается green (включая `test_eval_scenarios`, `test_integrations`)
+
+### MVP Done checklist (код)
+- [x] ROADMAP_MVP + research waves 2–5
+- [x] Фазы 0–5 артефакты и тесты
+- [ ] E2E W1–W11 подписаны с датой (human, VPS)
+- [ ] 30 дней solo journal
+
+---
+
+## 2026-06-02 — Ресурсы VPS + риски Groq (NOTEBOOK, бюджет LLM)
+
+### Решение
+- Память **вне** Groq: `workspace/users/{id}/NOTEBOOK.md` + инструмент `append_notebook` (Эльза, Егор).
+- Мягкий дневной лимит: `LLM_SOFT_DAILY_CALLS`, `llm_budget.py`, `llm_context.py`; при исчерпании — понятное сообщение в чат.
+- При ~85% бюджета — принудительный LIGHT tier (`GROQ_DEFER_HEAVY_ON_BUDGET`).
+- Планы оркестратора: `MAX_PLAN_STEPS` (default 4).
+- Док: [`docs/RESOURCE_AND_LLM.md`](RESOURCE_AND_LLM.md); env в [`deploy/FIRSTBYTE_VPS.md`](../deploy/FIRSTBYTE_VPS.md).
+
+### Файлы
+- `src/agents_tg/services/notebook.py`, `llm_budget.py`, `llm_context.py`
+- `src/agents_tg/services/tools/notebook_tools.py`
+- `src/agents_tg/services/prompts/memory_block.py` (блокнот в промпт)
+- `config/settings.py`: `LLM_SOFT_DAILY_CALLS`, `MAX_PLAN_STEPS`, …
+- `tests/test_resource_mitigations.py`
+
+### Verify
+- `python -m pytest tests/test_resource_mitigations.py tests/ -q --tb=short` (ожидается green)
+
+### Отложено (до апгрейда VPS / второго провайдера)
+- Ollama, Firecracker, MCP hub, eval harness 20+ сценариев.
+
+---
+
+## 2026-06-02 — Research wave 1 (promt1/2/3/4 plan)
+
+### Phase 0 — docs/research
+- `docs/research/README.md` — индекс + reconciliation + strategic backlog (P1/P2, defer Firecracker/MCP).
+- `02-prompt-architecture.md` из `ответ на промт3.md`; `legacy-souls.md`.
+- Обновлены `OPENCLAW_PARITY.md`, `E2E_AUTONOMY.md` (W11), `AGENT_BEHAVIOR.md` (deep_research).
+
+### Phase 1 — prompt-layer
+- `souls/research.md`; alias `research` / `sports_analyst` в `identity.py`.
+- `prompts/styles/research.py`, `security.py`, `coder.py` → wired в `specialists.py`.
+- `load_soul()` в PA + orchestrator.
+
+### Phase 2 — execution & trust
+- `tool_schemas.py` + schema pass в `verify_step.py`; `VERIFY_LLM_JUDGE`, `CONFIRMATION_TTL_SEC`.
+- `confirmation_replay.py`; callbacks replay; `register_and_persist` + token/keyboard в `shared_context_tools`.
+- `browser_tools.py`: `extracted_text`, docstring no-JS.
+
+### Phase 3 — delegation UX
+- `delegation_envelope.py`; контекст в `orchestrator_delegate`; DM delegation в `inbound_turn`.
+- `plan_cancel.py` + callback `plan_cancel:`; `memory_block` + `task_id`.
+- E2E W11 (D1–D10) — manual prod sign-off pending.
+
+### Verify (local)
+- `python -m pytest tests/ -q --tb=short` — **158 passed** (wave 1 tests included).
+
+### Acceptance checklist (wave 1)
+- [x] docs/research + parity reconcile
+- [x] research soul + per-role styles
+- [x] verify schema + confirmation replay
+- [x] DelegationEnvelope + DM delegate + plan cancel hook
+- [ ] Telegram prod D1–D6 (human)
+
+---
+
+## 2026-05-31 — Research wave 1 (prompts 1–4 → code)
+
+### Phase 0 — docs/research
+- Ingest `ответ на промт3.md` → `docs/research/02-prompt-architecture.md`
+- Index + reconciliation in `docs/research/README.md`; `legacy-souls.md` unchanged
+- `OPENCLAW_PARITY.md`: Task Brain/sandbox **done**; confirmation/delegation **partial** with pointers
+
+### Phase 1 — prompt-layer
+- `souls/research.md`, `identity.py` alias, per-role styles in `prompts/styles/{research,security,coder}.py`
+- `specialists.py`: `ROLE_STYLES`, `load_soul` via `identity`
+- `personal_assistant.py` / `orchestrator.py`: unified `load_soul`
+- `AGENT_BEHAVIOR.md`: `deep_research` (not `web_search`)
+
+### Phase 2 — execution
+- `tool_schemas.py`, compositional `verify_step.py` + `VERIFY_LLM_JUDGE`
+- `confirmation_service`: TTL 60s, `register_and_persist`, `run_code` gated
+- `confirmation_replay.py` + callbacks replay; `shared_context_tools` returns `confirmation_token`
+- `browser_tools.py`: `status_code`, `extracted_text`
+
+### Phase 3 — delegation UX
+- `delegation_envelope.py`, DM delegation in `inbound_turn.py`
+- `plan_cancel.py`, `progress_ux.cancel_keyboard`, cancel in `plan_executor`
+- `memory_block` optional `task_id`; `AgentEnvironment.task_id`
+
+### Phase 4
+- Strategic backlog P1/P2 in `docs/research/README.md` (Firecracker/MCP deferred)
+
+### Verify
+- `python -m pytest tests/ -q --tb=short` — **162 passed** (~54s)
+- `python -m mypy src/` — не запускался (mypy не установлен в локальном venv)
+
+### Manual E2E (pending)
+- W11 matrix in `E2E_AUTONOMY.md` — prod Telegram per `deploy/FIRSTBYTE_VPS.md`
+
+---
 
 - **Git:** локально и на VPS `a126373` (= `c806196` parity code + docs); `git push` — уже на `origin/master`.
 - **Deploy:** `python scripts/vps_deploy.py` — OK (`9d138d0` → `a126373`), `agents-tg` **active**, alembic OK, `apscheduler` установлен.

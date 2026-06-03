@@ -30,6 +30,7 @@ async def append_message_pg(
     agent_key: str,
     role: str,
     content: str,
+    task_id: str | None = None,
 ) -> None:
     factory = _session_factory()
     async with factory() as session:
@@ -39,6 +40,7 @@ async def append_message_pg(
                 agent_key=agent_key,
                 role=role,
                 content=content,
+                task_id=task_id,
             )
         )
         await session.commit()
@@ -49,15 +51,21 @@ async def get_recent_pg(
     telegram_user_id: int,
     agent_key: str,
     limit: int = 40,
+    task_id: str | None = None,
 ) -> list[ChatTurn]:
     factory = _session_factory()
     async with factory() as session:
+        filters = [
+            ChatMessage.telegram_user_id == telegram_user_id,
+            ChatMessage.agent_key == agent_key,
+        ]
+        if task_id:
+            filters.append(ChatMessage.task_id == task_id)
+        else:
+            filters.append(ChatMessage.task_id.is_(None))
         stmt = (
             select(ChatMessage)
-            .where(
-                ChatMessage.telegram_user_id == telegram_user_id,
-                ChatMessage.agent_key == agent_key,
-            )
+            .where(*filters)
             .order_by(ChatMessage.id.desc())
             .limit(limit)
         )

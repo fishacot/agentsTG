@@ -58,9 +58,11 @@ async def on_startup():
         from src.agents_tg.services.confirmation_service import confirmation_service
         from src.agents_tg.services.health_server import set_db_engine
         from src.agents_tg.services.plan_executor import plan_executor
+        from src.agents_tg.services.plan_recipe_service import plan_recipe_service
 
         job_store.set_engine(_db_engine)
         plan_executor.set_engine(_db_engine)
+        plan_recipe_service.set_pg_engine(_db_engine)
         confirmation_service.set_pg_engine(_db_engine)
         set_db_engine(_db_engine)
         register_default_hooks()
@@ -92,9 +94,7 @@ async def on_startup():
             return
         await bot.bot.send_message(chat_id=chat_id, text=body, parse_mode="HTML")
 
-    async def _wake_send(
-        chat_id: int, user_id: int, body: str, agent_key: str
-    ) -> None:
+    async def _wake_send(chat_id: int, user_id: int, body: str, agent_key: str) -> None:
         bot = manager.get_bot(agent_key) or manager.get_bot("personal_assistant")
         if not bot:
             return
@@ -154,8 +154,8 @@ async def on_shutdown():
 
     logger.info("🛑 Shutting down...")
 
-    from src.agents_tg.services.health_server import stop_health_server
     from src.agents_tg.services.agent_wake import agent_wake_service
+    from src.agents_tg.services.health_server import stop_health_server
     from src.agents_tg.services.reminder_service import reminder_service
 
     await agent_wake_service.stop()

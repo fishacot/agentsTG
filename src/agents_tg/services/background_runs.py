@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Callable, Awaitable
+from typing import Any, Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +57,8 @@ class BackgroundRunManager:
                 return
             from_user = getattr(message, "from_user", None)
             if from_user:
-                from src.agents_tg.services.agent_wake import agent_wake_service
                 from src.agents_tg.services.agent_runtime import TriggerKind
+                from src.agents_tg.services.agent_wake import agent_wake_service
 
                 await agent_wake_service.run_event_wake(
                     agent_key=agent_key,

@@ -53,7 +53,9 @@ def test_full_tier_detected_for_note_request():
 def test_light_tier_strips_tools():
     tools = [
         AgentTool(name="x", description="d", parameters={}, handler=_noop),
-        AgentTool(name="remember_about_user", description="d", parameters={}, handler=_noop),
+        AgentTool(
+            name="remember_about_user", description="d", parameters={}, handler=_noop
+        ),
     ]
     assert tools_for_tier(tools, PromptTier.LIGHT) == []
     assert len(tools_for_tier(tools, PromptTier.FULL)) == 2
@@ -64,7 +66,9 @@ def test_light_tier_strips_tools():
 
 def test_web_full_tier_research_only_with_explicit_search():
     tools = [
-        AgentTool(name="remember_about_user", description="d", parameters={}, handler=_noop),
+        AgentTool(
+            name="remember_about_user", description="d", parameters={}, handler=_noop
+        ),
         AgentTool(name="deep_research", description="d", parameters={}, handler=_noop),
     ]
     no_search = tools_for_tier(
@@ -81,4 +85,7 @@ def test_parse_tool_arguments_null():
     from src.agents_tg.services.agent_runner import parse_tool_arguments
 
     assert parse_tool_arguments("null", "u42") == {"user_id": "u42"}
-    assert parse_tool_arguments('{"fact":"dev"}', "u1") == {"fact": "dev", "user_id": "u1"}
+    assert parse_tool_arguments('{"fact":"dev"}', "u1") == {
+        "fact": "dev",
+        "user_id": "u1",
+    }
