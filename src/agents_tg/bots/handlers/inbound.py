@@ -77,10 +77,8 @@ def register_inbound(router: Router, bot: AgentBot) -> None:
         if is_group and not is_mentioned(message, bot.username):
             return
 
-        if await message_pipeline.is_duplicate(
-            bot.agent_key, message.chat.id, message.message_id
-        ):
-            return
+        # Dedupe only in gateway_router.dispatch (inbound_turn). Pre-check here
+        # claimed the idempotency key and caused silent drops (~30ms, no "Думаю").
 
         settings = get_settings()
         message_pipeline.debounce_sec = settings.MESSAGE_DEBOUNCE_MS / 1000.0

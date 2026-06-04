@@ -77,6 +77,12 @@ class InboundTurnService:
             envelope = envelope.model_copy(update={"text": combined_text})
         dispatch = await gateway_router.dispatch(envelope, trigger="inbound")
         if dispatch.duplicate:
+            log_event(
+                "inbound_duplicate_skip",
+                agent=bot.agent_key,
+                chat_id=message.chat.id,
+                message_id=message.message_id,
+            )
             return
 
         bound = dispatch.envelope or envelope

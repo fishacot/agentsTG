@@ -6,6 +6,35 @@
 
 ---
 
+## 2026-06-04 — Prod E2E automated (VPS)
+
+### Скрипт
+- `python scripts/vps_configure_prod.py` (env `VPS_SSH_PASSWORD`, не в репо)
+- Лог без секретов: [`docs/last_vps_e2e_automated.txt`](last_vps_e2e_automated.txt)
+
+### Результат на VPS (91.186.221.32)
+| Проверка | Статус |
+|----------|--------|
+| `REQUIRE_CONFIRM=true`, `DEBUG=false` | OK |
+| `systemctl is-active agents-tg` | active |
+| `GET /` health + `database.status` | ok |
+| `POST /v1/agent/run` без токена | 401 |
+| `POST /v1/agent/run` с Bearer | 200 |
+
+### Доки
+- [`docs/E2E_EXPLAINED.md`](E2E_EXPLAINED.md) — что такое E2E (RU)
+- [`docs/E2E_TELEGRAM_CHECKLIST.md`](E2E_TELEGRAM_CHECKLIST.md) — ~10 мин ручных шагов
+- [`docs/E2E_SIGNOFF_TEMPLATE.md`](E2E_SIGNOFF_TEMPLATE.md) — Pass 2026-06-04 для automated строк
+
+### Verify (local, перед коммитом E2E-артефактов)
+- `python -m pytest tests/test_health_api_token.py tests/test_plan_a2a_resume.py -q` — **5 passed**
+
+### Остаётся human
+- W1 #1–3,6–7, W11 D1–D6, напоминания, confirm replay в Telegram — чеклист выше
+- Ротация VPS-пароля и `AGENT_RUN_API_TOKEN` (пароль/токен светились в чате/терминале)
+
+---
+
 ## 2026-06-03 — Ship batch (MVP parity code)
 
 ### Verify

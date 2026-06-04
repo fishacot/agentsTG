@@ -16,6 +16,25 @@ async def test_dedupe_in_memory():
 
 
 @pytest.mark.asyncio
+async def test_pre_claim_before_gateway_dispatch_is_duplicate():
+    """Regression: inbound handler must not call is_duplicate before gateway."""
+    from src.agents_tg.gateway.envelope import OpenClawEnvelope
+    from src.agents_tg.gateway.router import gateway_router
+    from src.agents_tg.services.message_pipeline import message_pipeline
+
+    await message_pipeline.is_duplicate("personal_assistant", 1, 200)
+    env = OpenClawEnvelope(
+        chat_id=1,
+        user_id=7,
+        text="привет",
+        message_id=200,
+        agent_key="personal_assistant",
+    )
+    result = await gateway_router.dispatch(env)
+    assert result.duplicate is True
+
+
+@pytest.mark.asyncio
 async def test_followup_queue_while_busy():
     pipe = MessagePipeline()
     processed: list[str] = []
