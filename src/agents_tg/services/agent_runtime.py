@@ -182,7 +182,7 @@ class AgentRuntime:
         coordinator: Any,
         thinking_message: Message | None = None,
     ) -> AgentRunResult:
-        del agent_key, is_group  # reserved for future per-agent delivery profiles
+        del agent_key  # reserved for future per-agent delivery profiles
         sink = _build_outbound_sink(thinking_message=thinking_message)
         set_outbound_sink(sink)
         try:

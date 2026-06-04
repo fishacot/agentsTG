@@ -172,7 +172,7 @@ class ReminderService:
         from src.agents_tg.db.models import Reminder
 
         async with self._pg_engine.connect() as conn:
-            rows = await conn.execute(
+            result = await conn.scalars(
                 select(Reminder).where(
                     Reminder.telegram_user_id == telegram_user_id,
                     Reminder.status == "pending",
@@ -180,12 +180,12 @@ class ReminderService:
             )
             return [
                 {
-                    "id": r.id,
-                    "text": r.text,
-                    "fire_at": format_local(r.fire_at),
-                    "status": r.status,
+                    "id": rem.id,
+                    "text": rem.text,
+                    "fire_at": format_local(rem.fire_at),
+                    "status": rem.status,
                 }
-                for r in rows.scalars().all()
+                for rem in result.all()
             ]
 
     async def start(self) -> None:

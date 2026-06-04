@@ -6,6 +6,32 @@
 
 ---
 
+## 2026-06-04 — Elza DM silent reply fix + deploy
+
+### Причина
+Двойной dedupe: `inbound.py` вызывал `is_duplicate()` до `gateway_router.dispatch()`, сообщение помечалось обработанным, но LLM-путь не запускался (нет «🤖 Думаю…»).
+
+### Изменения
+- `src/agents_tg/bots/handlers/inbound.py` — убран pre-check dedupe
+- `src/agents_tg/services/inbound_turn.py` — log `inbound_duplicate_skip`
+- `tests/test_message_pipeline.py` — regression `test_pre_claim_before_gateway_dispatch_is_duplicate`
+
+### Verify
+- `pytest tests/ -q` — **231 passed**
+
+### Deploy
+- commit `de9368c` → `origin/master`
+- VPS `91.186.221.32`: `systemctl is-active agents-tg` → **active**, health ok
+- лог: `docs/last_vps_deploy.txt`
+
+### Follow-up hotfix (ошибка «Произошла ошибка» в TG)
+- `agent_runtime.run_inbound`: `del is_group` ломал вызов `process_fn` → UnboundLocalError
+- `reminder_service._list_pending_pg`: `conn.scalars()` вместо `execute().scalars()` (падало на `/start`)
+- verify: `pytest tests/test_agent_runtime.py tests/test_reminder_service.py` — 6 passed
+- deploy: commit после push на VPS
+
+---
+
 ## 2026-06-04 — Prod E2E automated (VPS)
 
 ### Скрипт
