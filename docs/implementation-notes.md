@@ -1603,3 +1603,12 @@ Ollama на VPS, vector RAG, Mem0 SaaS, E2B, webhook mode, streaming в TG.
 - Создан `docs/PLAN_LLM_OPENCLAW_E2E.md`: prod chain (VPS `groq` vs dev `gemini,groq`), env-матрица, OpenClaw parity gaps, phased A/B/C + E2E sign-off.
 - Источники: `settings.py`, `llm_client.py`, `agent_models.py`, `OPENCLAW_PARITY.md`, `ROADMAP_MVP.md`, `E2E_AUTONOMY.md`, `DEV_AGENT_ERGONOMICS.md`.
 - Следующий шаг (human): E2E sign-off по `E2E_TELEGRAM_CHECKLIST.md`; ops — `REQUIRE_CONFIRM=true` на prod.
+
+## 2026-05-31 — Execution plan (Sprint 0 + Phase B prep)
+
+- **Commit `1ead0c1`:** PLAN, DEV_AGENT_ERGONOMICS, E2E runbooks, `vps_configure_prod.py` (LLM audit block), W11 eval map, `JOURNAL_30_DAY.md`.
+- **Push:** `origin/master` @ `1ead0c1`.
+- **Verify:** pytest 232+ passed; eval 27 scenarios + `W11_E2E_MAP`; `smoke_prod_public.py` → health ok + API 401.
+- **VPS deploy:** blocked locally — `VPS_SSH_PASSWORD` not in `.env`. Public health OK. Elza logs (`last_incident_elza.txt`) show errors **before** hotfix `22f8748` — нужен `vps_deploy.py` + manual TG smoke.
+- **Phase B:** `PHASE_B_INTEGRATIONS_SMOKE.md`; CalDAV write deferred; `STEP_MODEL_ROUTING` via `APPLY_STEP_MODEL_ROUTING=1` + `vps_configure_prod.py`.
+- **Human pending:** W1–W7, W11 D1–D6 Telegram — `E2E_TELEGRAM_CHECKLIST.md`; integration smoke — `PHASE_B_INTEGRATIONS_SMOKE.md`.

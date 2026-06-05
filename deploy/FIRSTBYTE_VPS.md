@@ -28,6 +28,10 @@ LLM_SOFT_DAILY_CALLS=80
 MAX_PLAN_STEPS=4
 GROQ_DEFER_HEAVY_ON_BUDGET=true
 NOTEBOOK_MAX_CHARS=1500
+REQUIRE_CONFIRM=true
+MAX_TOKENS_FULL_TIER=768
+# Optional per-step routing (Groq 8b): enable via vps_configure_prod with APPLY_STEP_MODEL_ROUTING=1
+# STEP_MODEL_ROUTING={"classify":"llama-3.1-8b-instant","plan_step":"llama-3.1-8b-instant","finalize":"llama-3.1-8b-instant"}
 ```
 
 См. [`docs/RESOURCE_AND_LLM.md`](../docs/RESOURCE_AND_LLM.md) — память вне Groq (NOTEBOOK.md), лимиты планов и мягкий дневной бюджет.

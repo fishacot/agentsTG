@@ -407,3 +407,30 @@ def test_eval_scenario(scenario: EvalScenario):
 
 def test_eval_catalog_has_minimum_fixtures():
     assert len(SCENARIOS) >= 20
+
+
+W11_E2E_MAP: dict[str, list[str]] = {
+    "D1": [
+        "w11_d1_multi_step_plan_shape",
+        "plan_two_step_recipe_shape",
+        "recipe_three_steps_valid",
+        "full_tier_web_hint_on_search",
+    ],
+    "D2": ["handoff_message_mentions_agents"],
+    "D3": ["delegation_envelope_serializable", "delegation_relevant_context"],
+    "D4": ["cancel_keyboard_shape"],
+    "D5": ["cancel_keyboard_shape"],
+    "D6": ["gated_actions_include_run_code", "confirmation_parse_needs_markup"],
+    "D7": ["w11_d7_decline_no_replay"],
+    "D8": ["w11_d8_stale_token_rejected"],
+    "D9": ["w11_d9_expired_token"],
+    "D10": ["w11_d10_task_session_block"],
+}
+
+
+def test_w11_e2e_map_covers_all_scenario_ids():
+    ids = {s.id for s in SCENARIOS}
+    for e2e_id, mapped in W11_E2E_MAP.items():
+        assert mapped, f"{e2e_id} has empty map"
+        for sid in mapped:
+            assert sid in ids, f"{e2e_id} -> {sid} missing from SCENARIOS"

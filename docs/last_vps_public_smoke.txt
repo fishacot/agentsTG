@@ -1,0 +1,12 @@
+# Public prod smoke — 2026-06-05
+
+```json
+{
+  "date": "2026-06-05",
+  "host": "91.186.221.32",
+  "health_http": 200,
+  "health_ok": true,
+  "database_ok": true,
+  "api_unauth_401": true
+}
+```

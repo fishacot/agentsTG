@@ -2,7 +2,14 @@
 
 Шаблон для [`implementation-notes.md`](implementation-notes.md). Часовой пояс: Europe/Moscow.
 
-**Автоматизация VPS:** `python scripts/vps_configure_prod.py` → [`last_vps_e2e_automated.txt`](last_vps_e2e_automated.txt).
+**Автоматизация VPS:** `python scripts/vps_configure_prod.py` (SSH) или `python scripts/smoke_prod_public.py` (без SSH) → [`last_vps_e2e_automated.txt`](last_vps_e2e_automated.txt) / [`last_vps_public_smoke.txt`](last_vps_public_smoke.txt).
+
+## Automated (public smoke, 2026-05-31)
+
+| ID | Pass | Дата | Примечание |
+|----|------|------|------------|
+| W1 #5 health + DB | Pass | 2026-05-31 | `scripts/smoke_prod_public.py` |
+| W4 #17 API без токена → 401 | Pass | 2026-05-31 | public smoke |
 
 ## Automated (VPS script, 2026-06-04)
 
@@ -40,6 +47,6 @@
 
 | Integration | Pass | Дата | Примечание |
 |-------------|------|------|------------|
-| Calendar tool | | | **manual** |
-| GitHub list issues | | | **manual** |
-| Research cite format | | | **manual** |
+| Calendar tool | | | **manual** — [`PHASE_B_INTEGRATIONS_SMOKE.md`](PHASE_B_INTEGRATIONS_SMOKE.md); CalDAV write **deferred** |
+| GitHub list issues | | | **manual** — см. PHASE_B |
+| Research cite format | | | **manual** — см. PHASE_B |
