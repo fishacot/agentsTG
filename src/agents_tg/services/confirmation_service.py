@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import insert, select, update
+from sqlalchemy import insert, update
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from src.agents_tg.config.settings import get_settings

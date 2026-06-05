@@ -1612,3 +1612,11 @@ Ollama на VPS, vector RAG, Mem0 SaaS, E2B, webhook mode, streaming в TG.
 - **VPS deploy:** blocked locally — `VPS_SSH_PASSWORD` not in `.env`. Public health OK. Elza logs (`last_incident_elza.txt`) show errors **before** hotfix `22f8748` — нужен `vps_deploy.py` + manual TG smoke.
 - **Phase B:** `PHASE_B_INTEGRATIONS_SMOKE.md`; CalDAV write deferred; `STEP_MODEL_ROUTING` via `APPLY_STEP_MODEL_ROUTING=1` + `vps_configure_prod.py`.
 - **Human pending:** W1–W7, W11 D1–D6 Telegram — `E2E_TELEGRAM_CHECKLIST.md`; integration smoke — `PHASE_B_INTEGRATIONS_SMOKE.md`.
+
+## 2026-05-31 — CI flake8 fix (run #34 failed)
+
+- **Причина:** GitHub Actions workflow «Test» — шаг `Lint` (`flake8 src/ tests/`) упал на F401/W391; pytest не запускался.
+- **Run:** [#34](https://github.com/fishacot/agentsTG/actions/runs/26987237850) @ `ee58d20`.
+- **Fix:** удалены неиспользуемые импорты (в т.ч. `time` в `test_eval_scenarios.py`), W391 в пустых `__init__.py`.
+- **Verify локально:** `python -m flake8 src/ tests/` exit 0; pytest без регрессий.
+- **VPS:** пароль передан в чат — хранить только в локальном `.env` (`VPS_SSH_PASSWORD`), **сменить** после использования.

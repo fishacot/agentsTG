@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from src.agents_tg.sandbox.browser_tools import browser_navigate, browser_snapshot

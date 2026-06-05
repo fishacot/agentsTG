@@ -1,7 +1,5 @@
 """Artifact service workspace registration."""
 
-from pathlib import Path
-
 from src.agents_tg.services.artifact_service import ArtifactService
 
 

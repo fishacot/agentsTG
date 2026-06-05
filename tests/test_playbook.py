@@ -1,9 +1,5 @@
 """Owner RULES.md playbook injection."""
 
-from pathlib import Path
-
-import pytest
-
 from src.agents_tg.services.playbook import load_playbook_block, playbook_path
 from src.agents_tg.services.prompts.assembler import build_system_prompt
 from src.agents_tg.services.prompts.tier_rules import PromptTier

@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timedelta
-from typing import Any
 
 from src.agents_tg.services.reminder_parse import parse_reminder_when
-from src.agents_tg.utils.timezone_utils import format_local, get_app_tz, now_local
+from src.agents_tg.utils.timezone_utils import format_local, now_local
 
 # «каждый день в 11 утра», «ежедневно в 11:00 по мск»
 _DAILY_TIME = re.compile(

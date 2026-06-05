@@ -1,7 +1,5 @@
 """Tests for confirmation gates."""
 
-import pytest
-
 from src.agents_tg.config.settings import AppSettings
 from src.agents_tg.services.confirmation_service import confirmation_service
 

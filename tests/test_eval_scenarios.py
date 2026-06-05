@@ -16,7 +16,6 @@ W11 E2E matrix mapping (manual TG in docs/E2E_AUTONOMY.md):
 from __future__ import annotations
 
 import asyncio
-import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
