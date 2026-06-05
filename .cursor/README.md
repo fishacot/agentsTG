@@ -38,6 +38,22 @@ powershell -ExecutionPolicy Bypass -File scripts/install-cursor-extensions.ps1
 
 preflight · plan-deep · verify · postflight · task-intake · confirm-acceptance · **implementation-notes**
 
+## Skills
+
+| Путь | Назначение |
+|------|------------|
+| `skills/agents-tg-vps-debug/SKILL.md` | Отладка Elza/VPS: journalctl, deploy, health (без секретов) |
+
+## Scripts (agent ergonomics)
+
+| Скрипт | Назначение |
+|--------|------------|
+| `../scripts/validate_cursor_artifacts.py` | Валидация rules/commands/skills в `.cursor/` |
+| `../scripts/docs_list.py` | Индекс `docs/**/*.md` по frontmatter |
+| `../scripts/committer.ps1` | Безопасный commit на Windows |
+
+См. [`../docs/DEV_AGENT_ERGONOMICS.md`](../docs/DEV_AGENT_ERGONOMICS.md).
+
 ## Активация
 
 Скопируй эту папку `.cursor` в **корень вашего проекта**. CursoRules при этом может оставаться подпапкой.

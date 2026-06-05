@@ -1,3 +1,8 @@
+---
+summary: Production deploy на FirstByte VPS — SSH, systemd, health, Telegram acceptance
+read_when: деплой, restart agents-tg, проверка health :8080, VPS runbook
+---
+
 # FirstByte VPS — production deploy
 
 Production server: **91.186.221.32** (FirstByte FI), path `/opt/agentsTG`, systemd `agents-tg`.

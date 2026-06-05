@@ -1,3 +1,8 @@
+---
+summary: Команды проверки Python-проекта — pytest, black, flake8, mypy, bandit
+read_when: после правок кода, перед коммитом или PR, нужен список verify-команд
+---
+
 # PROJECT_VERIFICATION — AI Agents Telegram Assistant
 
 > Команды проверки для проекта. Канон процесса: `AGENTS.md` (CursoRules).
@@ -12,6 +17,7 @@
 | **Type checking** | `mypy src/` | После правок с типами |
 | **Безопасность** | `bandit -r src/ -ll` | После правок в auth/security/API |
 | **Markdown** | `npm run verify` (если есть package.json) | После правок в `*.md` |
+| **Cursor artifacts** | `python scripts/validate_cursor_artifacts.py` | После правок в `.cursor/` |
 | **Миграции БД** | `alembic check` | После правок моделей |
 | **Зависимости** | `poetry check` | После изменений в pyproject.toml |
 

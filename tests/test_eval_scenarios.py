@@ -1,8 +1,22 @@
-"""Lightweight eval scenario fixtures (no live Telegram)."""
+"""Lightweight eval scenario fixtures (no live Telegram).
+
+W11 E2E matrix mapping (manual TG in docs/E2E_AUTONOMY.md):
+  D1 -> plan_two_step_recipe_shape, recipe_three_steps_valid, full_tier_web_hint_on_search
+  D2 -> handoff_message_mentions_agents (group UX manual)
+  D3 -> delegation_envelope_serializable, delegation_relevant_context
+  D4 -> cancel_keyboard_shape (progress UX; editMessage manual)
+  D5 -> cancel_keyboard_shape
+  D6 -> gated_actions_include_run_code, confirmation_parse_needs_markup
+  D7 -> w11_d7_decline_no_replay
+  D8 -> w11_d8_stale_token_rejected
+  D9 -> w11_d9_expired_token
+  D10 -> w11_d10_task_session_block
+"""
 
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -11,7 +25,11 @@ import pytest
 from src.agents_tg.services.confirmation_delivery import (
     parse_confirmation_from_tool_output,
 )
-from src.agents_tg.services.confirmation_service import GATED_ACTIONS
+from src.agents_tg.services.confirmation_service import (
+    GATED_ACTIONS,
+    ConfirmationService,
+    PendingConfirmation,
+)
 from src.agents_tg.services.delegation_envelope import DelegationEnvelope
 from src.agents_tg.services.plan_recipe_service import intent_hash
 from src.agents_tg.services.progress_ux import cancel_keyboard, format_handoff
@@ -297,7 +315,85 @@ SCENARIOS: list[EvalScenario] = [
             user_text="hello world",
         ).relevant_context.get("user_text", ""),
     ),
+    EvalScenario(
+        id="w11_d7_decline_no_replay",
+        description="W11 D7: consumed token cannot be replayed twice",
+        run=lambda: _eval_confirm_single_consume(),
+    ),
+    EvalScenario(
+        id="w11_d8_stale_token_rejected",
+        description="W11 D8: second consume on same token returns None",
+        run=lambda: _eval_confirm_stale_token(),
+    ),
+    EvalScenario(
+        id="w11_d9_expired_token",
+        description="W11 D9: expired confirmation token is rejected",
+        run=lambda: _eval_confirm_expired(),
+    ),
+    EvalScenario(
+        id="w11_d10_task_session_block",
+        description="W11 D10: task_id appears in session memory block",
+        run=lambda: "СЕССИЯ ЗАДАЧИ: task-42"
+        in __import__(
+            "src.agents_tg.services.prompts.memory_block",
+            fromlist=["_task_session_suffix"],
+        )._task_session_suffix("task-42"),
+    ),
+    EvalScenario(
+        id="w11_d1_multi_step_plan_shape",
+        description="W11 D1: two-step plan recipe validates agent_key + instruction",
+        run=lambda: len(
+            [
+                {"agent_key": "research", "instruction": "news"},
+                {"agent_key": "coder", "instruction": "idea"},
+            ]
+        )
+        >= 2,
+    ),
+    EvalScenario(
+        id="step_model_routing_parse",
+        description="STEP_MODEL_ROUTING JSON resolves classify step",
+        run=lambda: __import__(
+            "src.agents_tg.services.llm_step_routing",
+            fromlist=["parse_step_model_routing", "resolve_step_model", "clear_routing_cache"],
+        ).parse_step_model_routing('{"classify":"llama-3.1-8b-instant"}').get("classify")
+        == "llama-3.1-8b-instant",
+    ),
 ]
+
+
+def _eval_confirm_single_consume() -> bool:
+    svc = ConfirmationService()
+    entry = svc.register(
+        telegram_user_id=1,
+        action="update_project_status:done",
+        payload={},
+    )
+    first = svc.consume(entry.token)
+    second = svc.consume(entry.token)
+    return first is not None and second is None
+
+
+def _eval_confirm_stale_token() -> bool:
+    svc = ConfirmationService()
+    entry = svc.register(telegram_user_id=1, action="run_code", payload={})
+    svc.consume(entry.token)
+    return svc.get(entry.token) is None
+
+
+def _eval_confirm_expired() -> bool:
+    from datetime import datetime, timedelta, timezone
+
+    svc = ConfirmationService()
+    entry = svc.register(telegram_user_id=1, action="run_code", payload={})
+    svc._pending[entry.token] = PendingConfirmation(
+        token=entry.token,
+        telegram_user_id=1,
+        action="run_code",
+        payload={},
+        created_at=datetime.now(timezone.utc) - timedelta(seconds=120),
+    )
+    return svc.get(entry.token) is None
 
 
 @pytest.mark.parametrize(

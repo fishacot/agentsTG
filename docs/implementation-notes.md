@@ -1,8 +1,43 @@
+<!-- summary: Журнал решений разработки — новые записи сверху -->
+<!-- read_when: нужен контекст недавних fix/deploy, tradeoffs, результаты verify -->
+
 # Implementation notes — AI Agents Telegram Assistant
 
 > Журнал решений и прогресса разработки мультиагентной системы для Telegram
 
 Новые записи — **сверху** (под этим блоком).
+
+---
+
+## 2026-06-05 — Agent-scripts ergonomics + AirLLM assessment
+
+### Цель
+
+Cherry-pick полезных паттернов из steipete/agent-scripts; оценка AirLLM без интеграции в runtime.
+
+### Добавлено
+
+- `scripts/validate_cursor_artifacts.py` — `.cursor/rules`, `commands`, optional `skills`
+- `scripts/docs_list.py` — индекс `docs/**/*.md` (`summary`, `read_when`)
+- `scripts/committer.ps1` — безопасный commit Windows (refuse `.env`)
+- `.cursor/skills/agents-tg-vps-debug/SKILL.md`
+- `docs/DEV_AGENT_ERGONOMICS.md` — скрипты + **AirLLM no-go** для prod VPS
+
+### Frontmatter
+
+- `docs/PROJECT_VERIFICATION.md`, `deploy/FIRSTBYTE_VPS.md` — YAML
+- `docs/implementation-notes.md` — HTML comment (running log, без YAML)
+
+### Решения
+
+- AirLLM **не** в `pyproject.toml` / `llm_client` — CPU VPS, API mismatch, latency
+- Альтернативы: cloud chain (Gemini/Groq/Qwen); future GPU + Ollama/vLLM proxy
+
+### Verify (2026-06-05)
+
+- `python scripts/validate_cursor_artifacts.py`
+- `pytest tests/ -q --tb=no -x`
+- markdownlint на новых md — OK; полный `npm run verify` — pre-existing debt
 
 ---
 
@@ -1562,3 +1597,9 @@ Ollama на VPS, vector RAG, Mem0 SaaS, E2B, webhook mode, streaming в TG.
 - Точность категоризации расходов > 90%
 - Coverage тестами > 80%
 - **GitHub Actions (code ship):** run **#14** id 26724485582 — **green** — https://github.com/fishacot/agentsTG/actions/runs/26724485582
+
+## 2026-05-31 — План LLM + OpenClaw + E2E
+
+- Создан `docs/PLAN_LLM_OPENCLAW_E2E.md`: prod chain (VPS `groq` vs dev `gemini,groq`), env-матрица, OpenClaw parity gaps, phased A/B/C + E2E sign-off.
+- Источники: `settings.py`, `llm_client.py`, `agent_models.py`, `OPENCLAW_PARITY.md`, `ROADMAP_MVP.md`, `E2E_AUTONOMY.md`, `DEV_AGENT_ERGONOMICS.md`.
+- Следующий шаг (human): E2E sign-off по `E2E_TELEGRAM_CHECKLIST.md`; ops — `REQUIRE_CONFIRM=true` на prod.

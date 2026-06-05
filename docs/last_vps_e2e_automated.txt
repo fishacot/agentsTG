@@ -1,0 +1,17 @@
+# VPS automated E2E — 2026-06-04
+
+REQUIRE_CONFIRM=true, DEBUG=false applied on VPS.
+
+```json
+{
+  "date": "2026-06-04",
+  "automated": {
+    "W1_5_health": true,
+    "W1_5_database": true,
+    "W4_17_api_unauth_401": true,
+    "W4_17_api_auth": true,
+    "REQUIRE_CONFIRM_env": true,
+    "service_active": true
+  }
+}
+```
